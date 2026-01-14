@@ -216,11 +216,12 @@ tabD = uitab(tabs,"Title","📊 Distribuzione");
 tabFunc = uitab(tabs,"Title","📉 Funzione");
 
 % === TAB SQUADRE ===
-sgrid = uigridlayout(tabS, [2 1]); sgrid.RowHeight={40, '1x'};
+sgrid = uigridlayout(tabS, [3 1]); sgrid.RowHeight={40, '1x', 260};
 sgridTop = uigridlayout(sgrid, [1 3]); sgridTop.Layout.Row=1; sgridTop.ColumnWidth={'1x', 150, 150};
 lblTeamSel = uilabel(sgridTop, "Text", "Seleziona squadra per simulare svincoli:", "FontWeight","bold");
 lblTeamSel.Layout.Column=1;
-ddTeam = uidropdown(sgrid Top, "Items", cellstr(uniqueTeams), "ValueChangedFcn", @onTeamSelected);
+ddTeam = uidropdown(sgridTop, "Items", cellstr(uniqueTeams), "ValueChangedFcn", @onTeamSelected);
+selectedTeamForRelease = string(ddTeam.Value);
 ddTeam.Layout.Column=2;
 btnSimRelease = uibutton(sgridTop, "Text", "🔄 Simula Svincoli", "FontWeight","bold", "BackgroundColor",[1 0.9 0.6]);
 btnSimRelease.Layout.Column=3; btnSimRelease.ButtonPushedFcn = @(~,~) simulateReleases();
@@ -228,6 +229,10 @@ btnSimRelease.Layout.Column=3; btnSimRelease.ButtonPushedFcn = @(~,~) simulateRe
 tblTeams = uitable(sgrid); tblTeams.Layout.Row=2; tblTeams.ColumnSortable=true; tblTeams.FontName="Segoe UI"; tblTeams.FontSize=10;
 tblTeams.ColumnEditable = [false false false true true true false false false]; 
 tblTeams.CellEditCallback = @onTeamEdit;
+
+tblRelease = uitable(sgrid); tblRelease.Layout.Row=3; tblRelease.ColumnSortable=true; tblRelease.FontName="Segoe UI"; tblRelease.FontSize=10;
+tblRelease.ColumnEditable = [true false false false false false false false false];
+tblRelease.CellEditCallback = @onReleaseEdit;
 
 % === TAB DISTRIBUZIONE ===
 dgrid = uigridlayout(tabD,[2 2]); dgrid.RowHeight={'1x','1x'}; dgrid.ColumnWidth={'1x','1x'};
@@ -251,27 +256,30 @@ autoOn = uicheckbox(ag,"Text","🔄 AUTO","Value",false,"FontWeight","bold"); au
 btnTune = uibutton(ag,"Text","▶ CALCOLA","FontWeight","bold","FontSize",11,"BackgroundColor",[0.4 0.8 1]); 
 btnTune.Layout.Row=1; btnTune.Layout.Column=[2 3];
 
-createLabel(ag,2,1,"💎 Top","bold"); 
+createLabel(ag,2,1,"💎 Top (max)","bold"); 
 sTop=uislider(ag,"Limits",[80 400],"Value",TGT.topTarget); sTop.Layout.Row=2; sTop.Layout.Column=2; 
 eTop=uieditfield(ag,"numeric","Limits",[80 400],"Value",TGT.topTarget,"ValueDisplayFormat","%.0f"); eTop.Layout.Row=2; eTop.Layout.Column=3;
 
-createLabel(ag,3,1,"🥈 Medio-Alto","bold"); 
+createLabel(ag,3,1,"🥈 Medio-Alto (titolari)","bold"); 
 sMidHigh=uislider(ag,"Limits",[40 150],"Value",TGT.midHighTarget); sMidHigh.Layout.Row=3; sMidHigh.Layout.Column=2; 
 eMidHigh=uieditfield(ag,"numeric","Limits",[40 150],"Value",TGT.midHighTarget,"ValueDisplayFormat","%.0f"); eMidHigh.Layout.Row=3; eMidHigh.Layout.Column=3;
 
-createLabel(ag,4,1,"🥉 Medio","bold"); 
+createLabel(ag,4,1,"🥉 Medio (rotazione)","bold"); 
 sMid=uislider(ag,"Limits",[15 80],"Value",TGT.midTarget); sMid.Layout.Row=4; sMid.Layout.Column=2; 
 eMid=uieditfield(ag,"numeric","Limits",[15 80],"Value",TGT.midTarget,"ValueDisplayFormat","%.0f"); eMid.Layout.Row=4; eMid.Layout.Column=3;
 
-createLabel(ag,5,1,"📉 Scarti %","bold"); 
+createLabel(ag,5,1,"📉 Bassi (% riserve)","bold"); 
 sLow=uislider(ag,"Limits",[0 30],"Value",TGT.lowTarget); sLow.Layout.Row=5; sLow.Layout.Column=2; 
 eLow=uieditfield(ag,"numeric","Limits",[0 30],"Value",TGT.lowTarget,"ValueDisplayFormat","%.1f"); eLow.Layout.Row=5; eLow.Layout.Column=3;
 
 createLabel(ag,6,[1 3],"🔒 Locks: blocca parametri dal tuning","italic");
-lockGrid = uigridlayout(ag, [1 3]); lockGrid.Layout.Row=7; lockGrid.Layout.Column=[1 3]; lockGrid.ColumnWidth={'1x','1x','1x'};
+lockGrid = uigridlayout(ag, [1 5]); lockGrid.Layout.Row=7; lockGrid.Layout.Column=[1 3];
+lockGrid.ColumnWidth={'1x','1x','1x','1x','1x'};
 chkLockGamma = uicheckbox(lockGrid, "Text", "🔒γ", "Value", false); chkLockGamma.Layout.Column=1;
 chkLockMu = uicheckbox(lockGrid, "Text", "🔒μ", "Value", false); chkLockMu.Layout.Column=2;
 chkLockLambda = uicheckbox(lockGrid, "Text", "🔒λ", "Value", false); chkLockLambda.Layout.Column=3;
+chkLockPhi = uicheckbox(lockGrid, "Text", "🔒φ", "Value", false); chkLockPhi.Layout.Column=4;
+chkLockK = uicheckbox(lockGrid, "Text", "🔒k", "Value", false); chkLockK.Layout.Column=5;
 
 tbl = uitable(rg); tbl.Layout.Row=3; tbl.FontName="Segoe UI"; tbl.FontSize=10; tbl.ColumnSortable=true;
 btnExport = uibutton(rg, "Text", "📥 Esporta Excel Completo", "FontWeight","bold","FontSize",11, "BackgroundColor",[0.7 1 0.7]); btnExport.Layout.Row=4;
@@ -304,6 +312,8 @@ eLow.ValueChangedFcn = @(src,~) onTargetChange("low", src.Value, false);
 chkLockGamma.ValueChangedFcn = @(src,~) onLockChange("gamma", src.Value);
 chkLockMu.ValueChangedFcn = @(src,~) onLockChange("mu", src.Value);
 chkLockLambda.ValueChangedFcn = @(src,~) onLockChange("lambda", src.Value);
+chkLockPhi.ValueChangedFcn = @(src,~) onLockChange("phi", src.Value);
+chkLockK.ValueChangedFcn = @(src,~) onLockChange("k", src.Value);
 
 wireAllParams();
 applyLayout();
@@ -315,3 +325,544 @@ recomputeAndPlot();
     function onTeamEdit(~, evt)
         if isempty(evt.Indices), return; end
         rowIdx = evt.Indices(1);
+        colIdx = evt.Indices(2);
+        teamName = string(tblTeams.Data{rowIdx, 1});
+        if colIdx == 4
+            TeamBankMap(char(teamName)) = evt.NewData;
+        elseif colIdx == 5
+            TeamBonusMap(char(teamName)) = evt.NewData;
+        elseif colIdx == 6
+            TeamMalusMap(char(teamName)) = evt.NewData;
+        end
+        updateTeamsTable();
+        recomputeAndPlot();
+    end
+
+    function onReleaseEdit(~, evt)
+        if isempty(evt.Indices), return; end
+        if evt.Indices(2) ~= 1, return; end
+        if isempty(selectedTeamForRelease), return; end
+        updateReleaseSummary();
+    end
+
+    function onTeamSelected(src, ~)
+        selectedTeamForRelease = string(src.Value);
+        updateReleaseTable();
+    end
+
+    function simulateReleases()
+        if strlength(selectedTeamForRelease) == 0
+            selectedTeamForRelease = string(ddTeam.Value);
+        end
+        updateReleaseTable();
+        updateReleaseSummary();
+    end
+
+    function updateTeamsTable()
+        teams = uniqueTeams;
+        nTeams = numel(teams);
+        data = cell(nTeams, 9);
+        releaseCredit = zeros(nTeams, 1);
+        for iTeam = 1:nTeams
+            teamName = teams(iTeam);
+            maskTeam = team_c == teamName;
+            spend = sum(cost_c(maskTeam), "omitnan");
+            nPlayers = sum(maskTeam);
+            baseBank = getMapValue(TeamBankMap, teamName);
+            bonus = getMapValue(TeamBonusMap, teamName);
+            malus = getMapValue(TeamMalusMap, teamName);
+            bankTot = baseBank + bonus - malus;
+            credits = S.C_max - spend + bankTot;
+            if teamName == selectedTeamForRelease
+                releaseCredit(iTeam) = getReleaseSelectedTotal();
+            end
+            creditsPost = credits + releaseCredit(iTeam);
+            data(iTeam, :) = {char(teamName), nPlayers, round(spend), baseBank, bonus, malus, ...
+                round(bankTot), round(credits), round(creditsPost)};
+        end
+        tblTeams.Data = data;
+        tblTeams.ColumnName = {"Squadra","Giocatori","Spesa","Banca Base","Bonus","Malus","Banca Tot","Crediti","Crediti post-svincolo"};
+        tblTeams.ColumnWidth = {'1x',70,80,90,70,70,90,80,130};
+    end
+
+    function updateReleaseTable()
+        teamName = string(ddTeam.Value);
+        selectedTeamForRelease = teamName;
+        mask = team_c == teamName;
+        if ~any(mask)
+            tblRelease.Data = {};
+            return;
+        end
+        [value, releaseValue, roleLabel] = computeValues();
+        fvmTeam = fvm_c(mask);
+        quotTeam = quot_c(mask);
+        costTeam = cost_c(mask);
+        nameTeam = name_c(mask);
+        roleTeam = roleLabel(mask);
+        valueTeam = value(mask);
+        releaseTeam = releaseValue(mask);
+        outTeam = isOut_c(mask);
+        releaseFlags = false(sum(mask), 1);
+        releaseTable = table(releaseFlags, nameTeam, roleTeam, fvmTeam, quotTeam, costTeam, valueTeam, releaseTeam, outTeam, ...
+            'VariableNames', {'Svincola','Nome','Ruolo','FVM','Quot','Costo','Valore','ValoreSvincolo','OutList'});
+        tblRelease.Data = table2cell(releaseTable);
+        tblRelease.ColumnName = releaseTable.Properties.VariableNames;
+        tblRelease.ColumnWidth = {70,'1x',70,60,60,60,70,90,70};
+        updateReleaseSummary();
+    end
+
+    function updateReleaseSummary()
+        updateTeamsTable();
+        updateKpi();
+    end
+
+    function total = getReleaseSelectedTotal()
+        total = 0;
+        if isempty(tblRelease.Data)
+            return;
+        end
+        data = tblRelease.Data;
+        selected = cellfun(@(x) logical(x), data(:, 1));
+        if any(selected)
+            releaseValues = cell2mat(data(:, 8));
+            total = sum(releaseValues(selected), "omitnan");
+        end
+    end
+
+    function runAutoTune()
+        applyTargets();
+        recomputeAndPlot();
+    end
+
+    function maybeAutoTune()
+        if autoOn.Value
+            runAutoTune();
+        end
+    end
+
+    function onTargetChange(targetName, value, isChanging)
+        switch targetName
+            case "top"
+                TGT.topTarget = value;
+                if ~isChanging, eTop.Value = value; end
+            case "midhigh"
+                TGT.midHighTarget = value;
+                if ~isChanging, eMidHigh.Value = value; end
+            case "mid"
+                TGT.midTarget = value;
+                if ~isChanging, eMid.Value = value; end
+            case "low"
+                TGT.lowTarget = value;
+                if ~isChanging, eLow.Value = value; end
+        end
+        if autoOn.Value && ~isChanging
+            runAutoTune();
+        end
+        updateBandChart();
+    end
+
+    function onLockChange(name, value)
+        LOCKS.(name) = logical(value);
+    end
+
+    function applyTargets()
+        if ~LOCKS.gamma
+            S.gamma = clamp(0.5 + (TGT.topTarget / 400), 0.6, 2.4);
+            H_ui.gamma.edt.Value = S.gamma;
+        end
+        if ~LOCKS.mu
+            S.mu = clamp(0.5 + (TGT.lowTarget / 10), 0, 6);
+            H_ui.mu.edt.Value = S.mu;
+        end
+        if ~LOCKS.lambda
+            S.lambda = clamp((TGT.midHighTarget - 40) / 120, 0, 1);
+            H_ui.lambda.edt.Value = S.lambda;
+        end
+        if ~LOCKS.phi
+            S.phi = clamp(40 + (TGT.midTarget / 2), 0, 100);
+            H_ui.phi.edt.Value = S.phi;
+        end
+        if ~LOCKS.k
+            S.k = clamp(0.2 + (TGT.midTarget / 80), 0.05, 2.5);
+            H_ui.k.edt.Value = S.k;
+        end
+    end
+
+    function toggleLeft()
+        leftShown = ~leftShown;
+        if leftShown
+            main.ColumnWidth{1} = 480;
+            btnToggleL.Text = "◄ Panel";
+        else
+            main.ColumnWidth{1} = 0;
+            btnToggleL.Text = "Panel ►";
+        end
+    end
+
+    function toggleRight()
+        rightShown = ~rightShown;
+        if rightShown
+            main.ColumnWidth{3} = 420;
+            btnToggleR.Text = "Panel ►";
+        else
+            main.ColumnWidth{3} = 0;
+            btnToggleR.Text = "◄ Panel";
+        end
+    end
+
+    function applyLayout()
+        updateTeamsTable();
+        updateReleaseTable();
+        updateKpi();
+    end
+
+    function wireAllParams()
+        fields = fieldnames(H_ui);
+        for i = 1:numel(fields)
+            item = H_ui.(fields{i});
+            if isstruct(item) && isfield(item, 'edt') && isfield(item, 'name')
+                item.edt.ValueChangedFcn = @(src,~) syncParam(item.name, src.Value, 'edit');
+                if isfield(item, 'slider')
+                    item.slider.ValueChangedFcn = @(src,~) syncParam(item.name, src.Value, 'slider');
+                end
+            end
+        end
+    end
+
+    function syncParam(fieldName, value, source)
+        if isfield(H_ui, fieldName)
+            if isfield(H_ui.(fieldName), 'slider') && source == "edit"
+                H_ui.(fieldName).slider.Value = value;
+            end
+            if isfield(H_ui.(fieldName), 'edt') && source == "slider"
+                H_ui.(fieldName).edt.Value = value;
+            end
+        end
+        onParamChanged(fieldName, value);
+    end
+
+    function onParamChanged(fieldName, value)
+        if fieldName == "epsilon"
+            value = value / 100;
+        end
+        S.(fieldName) = value;
+        if fieldName == "C_max" || fieldName == "epsilon"
+            calcWstarAuto();
+        end
+        recomputeAndPlot();
+    end
+
+    function calcWstarAuto()
+        nTeams = numel(uniqueTeams);
+        S.Wstar = (S.C_max * nTeams) * (1 - S.epsilon);
+        H_ui.Wstar_display.Value = round(S.Wstar);
+        S.C_actual = sum(cost_c, "omitnan");
+        H_ui.C_actual.edt.Value = round(S.C_actual);
+        updateTeamsTable();
+    end
+
+    function recomputeAndPlot()
+        [value, releaseValue, roleLabel] = computeValues();
+        outTable = table(id_c, name_c, roleLabel, team_c, fvm_c, quot_c, cost_c, value, releaseValue, ...
+            'VariableNames', {'ID','Nome','Ruolo','Squadra','FVM','Quot','Costo','Valore','ValoreSvincolo'});
+        tbl.Data = table2cell(outTable);
+        tbl.ColumnName = outTable.Properties.VariableNames;
+        tbl.ColumnWidth = {60,'1x',60,80,60,60,60,70,90};
+        updateKpi();
+        updateCharts(value, releaseValue);
+    end
+
+    function updateCharts(value, releaseValue)
+        cla(axPrice); histogram(axPrice, value, 20, 'FaceColor',[0.3 0.7 1]); grid(axPrice, "on");
+        xlabel(axPrice, "Valore"); ylabel(axPrice, "Giocatori");
+        cla(axCash); histogram(axCash, releaseValue, 20, 'FaceColor',[1 0.6 0.3]); grid(axCash, "on");
+        xlabel(axCash, "Valore Svincolo"); ylabel(axCash, "Giocatori");
+        updateBandChart();
+        updateFunctionChart();
+    end
+
+    function updateBandChart()
+        [value, ~, ~] = computeValues();
+        edges = [0, TGT.lowTarget, TGT.midTarget, TGT.midHighTarget, TGT.topTarget, max(value) + 1];
+        counts = histcounts(value, edges);
+        cla(axBands);
+        bar(axBands, counts, "FaceColor",[0.4 0.9 0.6]);
+        axBands.XTick = 1:numel(counts);
+        axBands.XTickLabel = {"Bassi","Medi","Medio-Alti","Top","Over"};
+        ylabel(axBands, "Giocatori");
+        title(axBands, "Fasce di Prezzo (target tuner)");
+        grid(axBands, "on");
+    end
+
+    function updateFunctionChart()
+        fvmRange = linspace(min(fvm_c), max(fvm_c), 100);
+        quotMed = median(quot_c, "omitnan");
+        dummyQuot = repmat(quotMed, size(fvmRange));
+        [value, ~, ~] = computeValues(fvmRange, dummyQuot, repmat("", size(fvmRange)), repmat("", size(fvmRange)), zeros(size(fvmRange)), false(size(fvmRange)));
+        cla(axFunc);
+        plot(axFunc, fvmRange, value, "LineWidth",2, "Color",[0.2 0.4 0.9]);
+        xlabel(axFunc, "FVM");
+        ylabel(axFunc, "Valore");
+        title(axFunc, "Curva di valorizzazione (FVM vs Valore)");
+        grid(axFunc, "on");
+    end
+
+    function updateKpi()
+        totalValue = sum(outTable.Valore, "omitnan");
+        totalRelease = sum(outTable.ValoreSvincolo, "omitnan");
+        nPlayers = height(outTable);
+        selectedRelease = getReleaseSelectedTotal();
+        kpi.Value = {
+            sprintf("Giocatori: %d", nPlayers)
+            sprintf("Valore totale: %.0f", totalValue)
+            sprintf("Valore svincoli: %.0f", totalRelease)
+            sprintf("Svincoli selezionati (%s): %.0f", selectedTeamForRelease, selectedRelease)
+            sprintf("Cmax: %.0f | W*: %.0f", S.C_max, S.Wstar)
+            sprintf("Parametri: γ=%.2f φ=%.0f μ=%.2f k=%.2f λ=%.2f", S.gamma, S.phi, S.mu, S.k, S.lambda)
+            };
+        coach.Value = {
+            "Suggerimenti tuning:"
+            "- Top: regola il picco dei top player"
+            "- Medio/Medio-alto: controlla il plateau dei titolari"
+            "- Bassi: incide sulle riserve"
+            "Locks: blocca i parametri da auto-tune"
+            };
+    end
+
+    function [value, releaseValue, roleLabel] = computeValues(fvmIn, quotIn, roleIn, roleClassicIn, costIn, outListIn)
+        if nargin < 1
+            fvmIn = fvm_c;
+            quotIn = quot_c;
+            roleIn = rm_c;
+            roleClassicIn = role_classic;
+            costIn = cost_c;
+            outListIn = isOut_c;
+        elseif nargin < 4
+            roleClassicIn = role_classic(1:numel(fvmIn));
+            costIn = zeros(size(fvmIn));
+            outListIn = false(size(fvmIn));
+        end
+        fvmNorm = normalizePercentile(fvmIn, S.pLowF, S.pHighF);
+        quotNorm = normalizePercentile(quotIn, S.pLowQ, S.pHighQ);
+        base = (S.phi/100) .* fvmNorm + (1 - S.phi/100) .* quotNorm;
+        base = base + S.alphaF * log(fvmIn + 1);
+        base = max(base, 0);
+        boost = 1 + S.lambda * ((fvmIn ./ max(S.k, 0.01)) .^ S.boostP);
+        value = S.mu + (base .^ S.gamma) .* boost;
+        roleWeight = arrayfun(@(i) getRoleWeight(roleIn(i), roleClassicIn(i)), 1:numel(value))';
+        value = value .* roleWeight;
+        value = max(value, 1);
+        releaseValue = computeReleaseValue(value, costIn, outListIn);
+        roleLabel = arrayfun(@(i) getRoleLabel(roleIn(i), roleClassicIn(i)), 1:numel(value))';
+    end
+    function releaseValue = computeReleaseValue(value, costIn, outListIn)
+        releaseValue = value;
+        if ~isempty(outListIn)
+            releaseValue(outListIn) = releaseValue(outListIn) .* (1 - S.GrossOb);
+        end
+        releaseValue = releaseValue .* (1 - S.GrossDec);
+        releaseValue = releaseValue - S.fee;
+        gain = value - costIn;
+        taxed = value - max(gain, 0) .* S.PlusTax;
+        releaseValue = min(releaseValue, taxed);
+        releaseValue = max(floor(releaseValue), 0);
+    end
+
+    function weight = getRoleWeight(roleMantra, roleClassic)
+        roleLabel = getRoleLabel(roleMantra, roleClassic);
+        switch roleLabel
+            case "P"
+                weight = S.wm_P;
+            case "Pc"
+                weight = S.wm_Pc;
+            case "T"
+                weight = S.wm_T;
+            case "A"
+                weight = S.wm_A;
+            case "W"
+                weight = S.wm_W;
+            case "C"
+                weight = S.wm_C;
+            case "M"
+                weight = S.wm_M;
+            case "E"
+                weight = S.wm_E;
+            case "Dc"
+                weight = S.wm_Dc;
+            case "Dd"
+                weight = S.wm_Dd;
+            case "Ds"
+                weight = S.wm_Ds;
+            case "B"
+                weight = S.wm_B;
+            case "D"
+                weight = S.wr_D;
+            otherwise
+                weight = S.wr_C;
+        end
+        if strlength(roleMantra) > 0
+            parts = split(roleMantra, {'/','-',' '});
+            parts = parts(parts ~= "");
+            if numel(parts) > 1
+                weight = weight * (1 + S.flex_bonus);
+            end
+        end
+    end
+
+    function roleLabel = getRoleLabel(roleMantra, roleClassic)
+        if strlength(roleMantra) > 0
+            parts = split(roleMantra, {'/','-',' '});
+            parts = parts(parts ~= "");
+            if numel(parts) > 1
+                roleLabel = string(parts(1));
+                return;
+            else
+                roleLabel = string(roleMantra);
+                return;
+            end
+        end
+        roleLabel = string(roleClassic);
+    end
+
+    function values = normalizePercentile(values, pLow, pHigh)
+        if isempty(values)
+            return;
+        end
+        mask = isfinite(values);
+        if ~any(mask)
+            values = zeros(size(values));
+            return;
+        end
+        lo = prctile(values(mask), pLow * 100);
+        hi = prctile(values(mask), pHigh * 100);
+        values = (values - lo) ./ max(hi - lo, eps);
+        values = min(max(values, 0), 1);
+        values(~mask) = 0;
+    end
+
+    function val = clamp(val, lo, hi)
+        val = min(max(val, lo), hi);
+    end
+
+    function val = getMapValue(map, key)
+        if isKey(map, char(key))
+            val = map(char(key));
+        else
+            val = 0;
+        end
+    end
+
+    function saveConfig()
+        [file, path] = uiputfile("*.mat", "Salva Configurazione");
+        if isequal(file,0), return; end
+        config = struct();
+        config.S = S;
+        config.TGT = TGT;
+        config.LOCKS = LOCKS;
+        config.TeamBankMap = TeamBankMap;
+        config.TeamBonusMap = TeamBonusMap;
+        config.TeamMalusMap = TeamMalusMap;
+        save(fullfile(path, file), "config");
+    end
+
+    function loadConfig()
+        [file, path] = uigetfile("*.mat", "Carica Configurazione");
+        if isequal(file,0), return; end
+        data = load(fullfile(path, file));
+        if ~isfield(data, "config"), return; end
+        config = data.config;
+        if isfield(config, "S"), S = config.S; end
+        if isfield(config, "TGT"), TGT = config.TGT; end
+        if isfield(config, "LOCKS"), LOCKS = config.LOCKS; end
+        if isfield(config, "TeamBankMap"), TeamBankMap = config.TeamBankMap; end
+        if isfield(config, "TeamBonusMap"), TeamBonusMap = config.TeamBonusMap; end
+        if isfield(config, "TeamMalusMap"), TeamMalusMap = config.TeamMalusMap; end
+        refreshUIFromState();
+        recomputeAndPlot();
+    end
+
+    function refreshUIFromState()
+        H_ui.C_max.edt.Value = S.C_max;
+        H_ui.epsilon.edt.Value = S.epsilon * 100;
+        H_ui.gamma.edt.Value = S.gamma;
+        H_ui.phi.edt.Value = S.phi;
+        H_ui.alphaF.edt.Value = S.alphaF;
+        H_ui.pLowF.edt.Value = S.pLowF;
+        H_ui.pHighF.edt.Value = S.pHighF;
+        H_ui.pLowQ.edt.Value = S.pLowQ;
+        H_ui.pHighQ.edt.Value = S.pHighQ;
+        H_ui.mu.edt.Value = S.mu;
+        H_ui.k.edt.Value = S.k;
+        H_ui.boostP.edt.Value = S.boostP;
+        H_ui.lambda.edt.Value = S.lambda;
+        H_ui.PlusTax.edt.Value = S.PlusTax;
+        H_ui.GrossOb.edt.Value = S.GrossOb;
+        H_ui.GrossDec.edt.Value = S.GrossDec;
+        H_ui.fee.edt.Value = S.fee;
+        sTop.Value = TGT.topTarget; eTop.Value = TGT.topTarget;
+        sMidHigh.Value = TGT.midHighTarget; eMidHigh.Value = TGT.midHighTarget;
+        sMid.Value = TGT.midTarget; eMid.Value = TGT.midTarget;
+        sLow.Value = TGT.lowTarget; eLow.Value = TGT.lowTarget;
+        chkLockGamma.Value = LOCKS.gamma;
+        chkLockMu.Value = LOCKS.mu;
+        chkLockLambda.Value = LOCKS.lambda;
+        chkLockPhi.Value = LOCKS.phi;
+        chkLockK.Value = LOCKS.k;
+        calcWstarAuto();
+    end
+
+    function exportFullData()
+        [file, path] = uiputfile("*.xlsx", "Esporta Dati Completi");
+        if isequal(file,0), return; end
+        writetable(outTable, fullfile(path, file), "Sheet", "Giocatori");
+        teamTable = cell2table(tblTeams.Data, "VariableNames", tblTeams.ColumnName);
+        writetable(teamTable, fullfile(path, file), "Sheet", "Squadre");
+    end
+
+    function onSelectRow(~, evt)
+        if isempty(evt.Indices), return; end
+        selRow = evt.Indices(1);
+        selName = string(outTable.Nome(selRow));
+        selectedTeamForRelease = string(outTable.Squadra(selRow));
+        ddTeam.Value = selectedTeamForRelease;
+        updateReleaseTable();
+    end
+
+    function label = createLabel(parent, row, col, text, style)
+        label = uilabel(parent, "Text", text);
+        if nargin > 4 && style == "bold"
+            label.FontWeight = "bold";
+        elseif nargin > 4 && style == "italic"
+            label.FontAngle = "italic";
+        end
+        label.Layout.Row = row;
+        label.Layout.Column = col;
+    end
+
+    function out = addInputRow(parent, label, fieldName, row, value)
+        createLabel(parent, row, 1, label, "bold");
+        edt = uieditfield(parent, "numeric", "Value", value);
+        edt.Layout.Row = row;
+        edt.Layout.Column = [2 3];
+        out = struct('edt', edt, 'name', fieldName);
+        H_ui.(fieldName) = out;
+    end
+
+    function out = addParamRow(parent, label, fieldName, minVal, maxVal, row, value, fmt)
+        createLabel(parent, row, 1, label);
+        sld = uislider(parent, "Limits", [minVal maxVal], "Value", value);
+        sld.Layout.Row = row;
+        sld.Layout.Column = 2;
+        edt = uieditfield(parent, "numeric", "Limits", [minVal maxVal], "Value", value, "ValueDisplayFormat", fmt);
+        edt.Layout.Row = row;
+        edt.Layout.Column = 3;
+        out = struct('slider', sld, 'edt', edt, 'name', fieldName);
+        H_ui.(fieldName) = out;
+        sld.ValueChangedFcn = @(src,~) edt.Value = src.Value;
+        edt.ValueChangedFcn = @(src,~) sld.Value = src.Value;
+    end
+
+    function out = addParamRowWithLock(parent, label, fieldName, minVal, maxVal, row, value, fmt)
+        out = addParamRow(parent, label, fieldName, minVal, maxVal, row, value, fmt);
+    end
+end
