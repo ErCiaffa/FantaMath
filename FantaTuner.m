@@ -182,7 +182,7 @@ H_ui.GrossDec = addParamRow(pg4, "tV (Volont.)", "GrossDec", 0, 0.5, row, S.Gros
 H_ui.fee = addParamRow(pg4, "f (Fee €)", "fee", 0, 20, row, S.fee, "%.0f");
 
 % === TAB 6: RUOLI ===
-tRoles = uitab(tabsLeft, "Title", "👥 Ruoli"); pgR = uigridlayout(tRoles, [18 3]); pgR.ColumnWidth={'1x','1.2x',60}; pgR.RowHeight=repmat({32},1,18); pgR.Scrollable="on"; row=1;
+tRoles = uitab(tabsLeft, "Title", "👥 Ruoli"); pgR = uigridlayout(tRoles, [18 3]); pgR.ColumnWidth={'1x','1.2x',60}; pgR.RowHeight=repmat({40},1,18); pgR.Scrollable="on"; row=1;
 createLabel(pgR,row,[1 3],"MANTRA (Prioritario)","bold"); row=row+1;
 H_ui.wm_Pc= addParamRow(pgR, "Pc (Re)",  "wm_Pc", 0.5, 2.5, row, S.wm_Pc, "%.2f"); row=row+1;
 H_ui.wm_T = addParamRow(pgR, "T (Principe)", "wm_T", 0.5, 2.5, row, S.wm_T, "%.2f"); row=row+1;
@@ -405,7 +405,10 @@ recomputeAndPlot();
         releaseFlags = false(sum(mask), 1);
         releaseTable = table(releaseFlags, nameTeam, roleTeam, fvmTeam, quotTeam, costTeam, valueTeam, releaseTeam, outTeam, ...
             'VariableNames', {'Svincola','Nome','Ruolo','FVM','Quot','Costo','Valore','ValoreSvincolo','OutList'});
-        tblRelease.Data = table2cell(releaseTable);
+        nameTeamChar = cellstr(nameTeam);
+        roleTeamChar = cellstr(roleTeam);
+        tblRelease.Data = [num2cell(releaseFlags), nameTeamChar, roleTeamChar, num2cell(fvmTeam), num2cell(quotTeam), ...
+            num2cell(costTeam), num2cell(valueTeam), num2cell(releaseTeam), num2cell(outTeam)];
         tblRelease.ColumnName = releaseTable.Properties.VariableNames;
         tblRelease.ColumnWidth = {70,'1x',70,60,60,60,70,90,70};
         updateReleaseSummary();
@@ -858,8 +861,8 @@ recomputeAndPlot();
         edt.Layout.Column = 3;
         out = struct('slider', sld, 'edt', edt, 'name', fieldName);
         H_ui.(fieldName) = out;
-        sld.ValueChangedFcn = @(src,~) edt.Value = src.Value;
-        edt.ValueChangedFcn = @(src,~) sld.Value = src.Value;
+        sld.ValueChangedFcn = @(src,~) set(edt, "Value", src.Value);
+        edt.ValueChangedFcn = @(src,~) set(sld, "Value", src.Value);
     end
 
     function out = addParamRowWithLock(parent, label, fieldName, minVal, maxVal, row, value, fmt)
