@@ -138,15 +138,15 @@ tabsLeft = uitabgroup(plLayout); tabsLeft.Layout.Row=1;
 tLega = uitab(tabsLeft, "Title", "💰 Lega"); pgL = uigridlayout(tLega, [10 3]); pgL.ColumnWidth={'1x','0.8x',80}; pgL.RowHeight=repmat({38},1,10); row=1;
 createLabel(pgL,row,[1 3],"Bilancio Automatico","bold"); row=row+1;
 
-edtC = uieditfield(pgL,"numeric","Value",S.C_actual, "Editable","off","FontWeight","bold","FontSize",13); 
+edtC = uieditfield(pgL,"numeric","Value",S.C_actual, "Editable","off","FontWeight","bold","FontSize",13, "ValueDisplayFormat","%.0f"); 
 edtC.Layout.Row=row; edtC.Layout.Column=[1 3];
 H_ui.C_actual = struct('edt', edtC); row=row+1;
 
-H_ui.C_max=addInputRow(pgL, "Cap Lega (Cmax)", "C_max", row, S.C_max); row=row+1;
-H_ui.epsilon=addInputRow(pgL, "Margine ε (%)", "epsilon", row, S.epsilon*100); row=row+1;
+H_ui.C_max=addInputRow(pgL, "Cap Lega (Cmax)", "C_max", row, S.C_max, "%.0f"); row=row+1;
+H_ui.epsilon=addInputRow(pgL, "Margine ε (%)", "epsilon", row, S.epsilon*100, "%.1f"); row=row+1;
 createLabel(pgL,row,[1 3],"W* = (Cmax × Squadre) × (1-ε)","italic"); row=row+1;
 
-edtWstar = uieditfield(pgL,"numeric","Value",S.Wstar, "Editable","off","FontWeight","bold","FontSize",12,"BackgroundColor",[0.9 1 0.9]); 
+edtWstar = uieditfield(pgL,"numeric","Value",S.Wstar, "Editable","off","FontWeight","bold","FontSize",12,"BackgroundColor",[0.9 1 0.9], "ValueDisplayFormat","%.0f"); 
 edtWstar.Layout.Row=row; edtWstar.Layout.Column=[1 3];
 H_ui.Wstar_display = edtWstar;
 
@@ -378,7 +378,7 @@ recomputeAndPlot();
             end
             creditsPost = credits + releaseCredit(iTeam);
             data(iTeam, :) = {char(teamName), nPlayers, round(spend), baseBank, bonus, malus, ...
-                round(bankTot), round(credits), round(creditsPost)};
+                formatNumber(bankTot), formatNumber(credits), formatNumber(creditsPost)};
         end
         tblTeams.Data = data;
         tblTeams.ColumnName = {"Squadra","Giocatori","Spesa","Banca Base","Bonus","Malus","Banca Tot","Crediti","Crediti post-svincolo"};
@@ -611,7 +611,7 @@ recomputeAndPlot();
     end
 
     function updateKpi()
-        if isempty(outTable) || ~ismember("Valore", outTable.Properties.VariableNames)
+        if width(outTable) == 0 || ~ismember("Valore", outTable.Properties.VariableNames)
             [value, releaseValue, ~] = computeValues();
             totalValue = sum(value, "omitnan");
             totalRelease = sum(releaseValue, "omitnan");
@@ -622,21 +622,21 @@ recomputeAndPlot();
             nPlayers = height(outTable);
         end
         selectedRelease = getReleaseSelectedTotal();
-        kpi.Value = {
-            sprintf("Giocatori: %d", nPlayers)
-            sprintf("Valore totale: %.0f", totalValue)
-            sprintf("Valore svincoli: %.0f", totalRelease)
-            sprintf("Svincoli selezionati (%s): %.0f", selectedTeamForRelease, selectedRelease)
-            sprintf("Cmax: %.0f | W*: %.0f", S.C_max, S.Wstar)
-            sprintf("Parametri: γ=%.2f φ=%.0f μ=%.2f k=%.2f λ=%.2f", S.gamma, S.phi, S.mu, S.k, S.lambda)
-            };
-        coach.Value = {
+        kpi.Value = [
+            "Giocatori: " + string(nPlayers)
+            "Valore totale: " + formatNumber(totalValue)
+            "Valore svincoli: " + formatNumber(totalRelease)
+            "Svincoli selezionati (" + selectedTeamForRelease + "): " + formatNumber(selectedRelease)
+            "Cmax: " + formatNumber(S.C_max) + " | W*: " + formatNumber(S.Wstar)
+            compose("Parametri: γ=%.2f φ=%.0f μ=%.2f k=%.2f λ=%.2f", S.gamma, S.phi, S.mu, S.k, S.lambda)
+            ];
+        coach.Value = [
             "Suggerimenti tuning:"
             "- Top: regola il picco dei top player"
             "- Medio/Medio-alto: controlla il plateau dei titolari"
             "- Bassi: incide sulle riserve"
             "Locks: blocca i parametri da auto-tune"
-            };
+            ];
     end
 
     function [value, releaseValue, roleLabel] = computeValues(fvmIn, quotIn, roleIn, roleClassicIn, costIn, outListIn)
@@ -750,6 +750,18 @@ recomputeAndPlot();
         values(~mask) = 0;
     end
 
+    function out = formatNumber(value)
+        if numel(value) > 1
+            out = arrayfun(@formatNumber, value);
+            return;
+        end
+        if isempty(value) || ~isfinite(value)
+            out = "0";
+        else
+            out = string(sprintf("%.0f", value));
+        end
+    end
+
     function val = clamp(val, lo, hi)
         val = min(max(val, lo), hi);
     end
@@ -849,9 +861,12 @@ recomputeAndPlot();
         label.Layout.Column = col;
     end
 
-    function out = addInputRow(parent, label, fieldName, row, value)
+    function out = addInputRow(parent, label, fieldName, row, value, fmt)
         createLabel(parent, row, 1, label, "bold");
-        edt = uieditfield(parent, "numeric", "Value", value);
+        if nargin < 6
+            fmt = "%.0f";
+        end
+        edt = uieditfield(parent, "numeric", "Value", value, "ValueDisplayFormat", fmt);
         edt.Layout.Row = row;
         edt.Layout.Column = [2 3];
         out = struct('edt', edt, 'name', fieldName);
