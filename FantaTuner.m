@@ -611,9 +611,16 @@ recomputeAndPlot();
     end
 
     function updateKpi()
-        totalValue = sum(outTable.Valore, "omitnan");
-        totalRelease = sum(outTable.ValoreSvincolo, "omitnan");
-        nPlayers = height(outTable);
+        if isempty(outTable) || ~ismember("Valore", outTable.Properties.VariableNames)
+            [value, releaseValue, ~] = computeValues();
+            totalValue = sum(value, "omitnan");
+            totalRelease = sum(releaseValue, "omitnan");
+            nPlayers = numel(value);
+        else
+            totalValue = sum(outTable.Valore, "omitnan");
+            totalRelease = sum(outTable.ValoreSvincolo, "omitnan");
+            nPlayers = height(outTable);
+        end
         selectedRelease = getReleaseSelectedTotal();
         kpi.Value = {
             sprintf("Giocatori: %d", nPlayers)
