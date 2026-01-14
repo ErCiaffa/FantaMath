@@ -405,7 +405,7 @@ recomputeAndPlot();
         releaseFlags = false(sum(mask), 1);
         releaseTable = table(releaseFlags, nameTeam, roleTeam, fvmTeam, quotTeam, costTeam, valueTeam, releaseTeam, outTeam, ...
             'VariableNames', {'Svincola','Nome','Ruolo','FVM','Quot','Costo','Valore','ValoreSvincolo','OutList'});
-        tblRelease.Data = tableToCellSafe(releaseTable);
+        tblRelease.Data = table2cell(releaseTable);
         tblRelease.ColumnName = releaseTable.Properties.VariableNames;
         tblRelease.ColumnWidth = {70,'1x',70,60,60,60,70,90,70};
         updateReleaseSummary();
@@ -531,10 +531,10 @@ recomputeAndPlot();
 
     function syncParam(fieldName, value, source)
         if isfield(H_ui, fieldName)
-            if isfield(H_ui.(fieldName), 'slider') && strcmp(source, 'edit')
+            if isfield(H_ui.(fieldName), 'slider') && source == "edit"
                 H_ui.(fieldName).slider.Value = value;
             end
-            if isfield(H_ui.(fieldName), 'edt') && strcmp(source, 'slider')
+            if isfield(H_ui.(fieldName), 'edt') && source == "slider"
                 H_ui.(fieldName).edt.Value = value;
             end
         end
@@ -565,7 +565,7 @@ recomputeAndPlot();
         [value, releaseValue, roleLabel] = computeValues();
         outTable = table(id_c, name_c, roleLabel, team_c, fvm_c, quot_c, cost_c, value, releaseValue, ...
             'VariableNames', {'ID','Nome','Ruolo','Squadra','FVM','Quot','Costo','Valore','ValoreSvincolo'});
-        tbl.Data = tableToCellSafe(outTable);
+        tbl.Data = table2cell(outTable);
         tbl.ColumnName = outTable.Properties.VariableNames;
         tbl.ColumnWidth = {60,'1x',60,80,60,60,60,70,90};
         updateKpi();
@@ -749,17 +749,6 @@ recomputeAndPlot();
             val = map(char(key));
         else
             val = 0;
-        end
-    end
-
-    function data = tableToCellSafe(tblIn)
-        data = table2cell(tblIn);
-        for r = 1:size(data, 1)
-            for c = 1:size(data, 2)
-                if isstring(data{r, c})
-                    data{r, c} = char(data{r, c});
-                end
-            end
         end
     end
 
