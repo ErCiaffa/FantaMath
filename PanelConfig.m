@@ -35,8 +35,10 @@ function panel = PanelConfig(parent, appState, controller)
 
     logPanel = uipanel(layout, 'Title', 'Log');
     logPanel.Layout.Row = 3;
-    logArea = uitextarea(logPanel, 'Editable', 'off');
+    logGrid = uigridlayout(logPanel, [1 1]);
+    logArea = uitextarea(logGrid, 'Editable', 'off');
     logArea.Layout.Row = 1;
+    logArea.Layout.Column = 1;
     controller.onLogUpdate = @(lines) set(logArea, 'Value', lines);
 end
 

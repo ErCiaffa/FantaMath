@@ -31,14 +31,26 @@ classdef FantaEngine
     methods(Static, Access = private)
         function normVal = normalize(values, pLow, pHigh)
             values = double(values);
-            lo = quantile(values, pLow);
-            hi = quantile(values, pHigh);
-            if hi == lo
-                normVal = zeros(size(values));
-            else
-                normVal = (values - lo) / (hi - lo);
-                normVal = max(0, min(1, normVal));
+            normVal = zeros(size(values));
+            validValues = values(~isnan(values));
+            if isempty(validValues)
+                return;
             end
+
+            pLow = max(0, min(1, pLow));
+            pHigh = max(0, min(1, pHigh));
+            if pHigh <= pLow
+                pHigh = min(1, pLow + 0.01);
+            end
+
+            lo = quantile(validValues, pLow);
+            hi = quantile(validValues, pHigh);
+            if hi == lo
+                return;
+            end
+
+            normVal = (values - lo) / (hi - lo);
+            normVal = max(0, min(1, normVal));
         end
     end
 end
