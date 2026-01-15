@@ -110,6 +110,9 @@ classdef FantaIO
             resolved = struct();
             for i = 1:numel(originalCols)
                 colKey = normalizedCols(i);
+                if strlength(colKey) == 0
+                    continue;
+                end
                 if isfield(canonicalMap, colKey)
                     canonical = canonicalMap.(colKey);
                     if ~isfield(resolved, canonical)
@@ -262,6 +265,9 @@ classdef FantaIO
                 values = synonyms.(key);
                 for j = 1:numel(values)
                     normalized = regexprep(lower(strtrim(values(j))), '[^a-z0-9]', '');
+                    if strlength(normalized) == 0
+                        continue;
+                    end
                     canonicalMap.(normalized) = key;
                 end
             end

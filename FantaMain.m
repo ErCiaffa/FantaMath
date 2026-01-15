@@ -21,7 +21,7 @@ function FantaMain()
 
     main = uigridlayout(root, [1 3]);
     main.Layout.Row = 2;
-    main.ColumnWidth = {360, '1x', 360};
+    main.ColumnWidth = {420, '1x', 360};
     main.ColumnSpacing = 10;
     panelConfig = PanelConfig(main, appState, controller);
     panelConfig.Layout.Column = 1;

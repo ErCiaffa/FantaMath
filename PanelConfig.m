@@ -1,37 +1,37 @@
 function panel = PanelConfig(parent, appState, controller)
     panel = uipanel(parent, 'Title', 'Parametri', 'FontWeight', 'bold');
     layout = uigridlayout(panel, [4 1]);
-    layout.RowHeight = {360, 140, 180, '1x'};
+    layout.RowHeight = {'1x', 140, 160, 140};
     layout.Padding = [10 10 10 10];
 
     tabGroup = uitabgroup(layout);
     tabGroup.Layout.Row = 1;
 
-    tabLeague = uitab(tabGroup, 'Title', 'Lega / Finanza');
+    tabLeague = uitab(tabGroup, 'Title', 'Lega');
     leagueGrid = uigridlayout(tabLeague, [4 4]);
-    leagueGrid.ColumnWidth = {'1x', 120, 70, 60};
+    leagueGrid.ColumnWidth = {180, 120, 70, 60};
     leagueGrid.RowHeight = {32, 32, 32, 32};
-    createParamRow(leagueGrid, 1, 'Sq', 'Numero squadre', appState, controller, [4 20], ...
+    createParamRow(leagueGrid, 1, 'Sq', 'Squadre (Sq)', appState, controller, [4 20], ...
         'Numero di squadre della lega.');
-    createParamRow(leagueGrid, 2, 'Cstr', 'Crediti iniziali', appState, controller, [100 1000], ...
+    createParamRow(leagueGrid, 2, 'Cstr', 'Crediti iniziali (Cstr)', appState, controller, [100 1000], ...
         'Crediti iniziali per squadra.');
-    createParamRow(leagueGrid, 3, 'Cmax', 'Cap liquidità', appState, controller, [100 2000], ...
+    createParamRow(leagueGrid, 3, 'Cmax', 'Cap liquidità (Cmax)', appState, controller, [100 2000], ...
         'Cap assoluto liquidità lega.');
-    createParamRow(leagueGrid, 4, 'epsilon', 'Margine crescita ε', appState, controller, [0 0.5], ...
+    createParamRow(leagueGrid, 4, 'epsilon', 'Margine crescita (ε)', appState, controller, [0 0.5], ...
         'Margine crescita capitale consentita.');
 
-    tabWeights = uitab(tabGroup, 'Title', 'Pesi Base');
+    tabWeights = uitab(tabGroup, 'Title', 'Pesi');
     weightGrid = uigridlayout(tabWeights, [2 4]);
-    weightGrid.ColumnWidth = {'1x', 120, 70, 60};
+    weightGrid.ColumnWidth = {180, 120, 70, 60};
     weightGrid.RowHeight = {32, 32};
-    createParamRow(weightGrid, 1, 'phi', 'Peso FVM φ', appState, controller, [0 100], ...
+    createParamRow(weightGrid, 1, 'phi', 'Peso FVM (φ)', appState, controller, [0 100], ...
         'Peso FVM (0-100).');
-    createParamRow(weightGrid, 2, 'omega', 'Peso QUOT ω', appState, controller, [0 100], ...
+    createParamRow(weightGrid, 2, 'omega', 'Peso QUOT (ω)', appState, controller, [0 100], ...
         'Peso QUOT (0-100).');
 
     tabPercentiles = uitab(tabGroup, 'Title', 'Percentili');
     pctGrid = uigridlayout(tabPercentiles, [4 4]);
-    pctGrid.ColumnWidth = {'1x', 120, 70, 60};
+    pctGrid.ColumnWidth = {180, 120, 70, 60};
     pctGrid.RowHeight = {32, 32, 32, 32};
     createParamRow(pctGrid, 1, 'pLow_FVM', 'pLow FVM', appState, controller, [0 1], ...
         'Percentile basso FVM.');
@@ -42,9 +42,9 @@ function panel = PanelConfig(parent, appState, controller)
     createParamRow(pctGrid, 4, 'pHigh_QUOT', 'pHigh QUOT', appState, controller, [0 1], ...
         'Percentile alto QUOT.');
 
-    tabTransforms = uitab(tabGroup, 'Title', 'Trasformazioni');
+    tabTransforms = uitab(tabGroup, 'Title', 'Trasf.');
     transGrid = uigridlayout(tabTransforms, [4 4]);
-    transGrid.ColumnWidth = {'1x', 120, 70, 60};
+    transGrid.ColumnWidth = {180, 120, 70, 60};
     transGrid.RowHeight = {32, 32, 32, 32};
     createCheckRow(transGrid, 1, 'useExp_FVM', 'Abilita exp FVM', appState, controller, ...
         'Abilita trasformazione esponenziale FVM.');
@@ -57,21 +57,41 @@ function panel = PanelConfig(parent, appState, controller)
 
     tabBoost = uitab(tabGroup, 'Title', 'Boost');
     boostGrid = uigridlayout(tabBoost, [5 4]);
-    boostGrid.ColumnWidth = {'1x', 120, 70, 60};
+    boostGrid.ColumnWidth = {180, 120, 70, 60};
     boostGrid.RowHeight = {32, 32, 32, 32, 32};
-    createParamRow(boostGrid, 1, 'gamma', 'Esponente γ', appState, controller, [0.5 5], ...
+    createParamRow(boostGrid, 1, 'gamma', 'Esponente concentrazione (γ)', appState, controller, [0.5 5], ...
         'Esponente concentrazione.');
-    createParamRow(boostGrid, 2, 'mu', 'Anti-1 μ', appState, controller, [0 1], ...
+    createParamRow(boostGrid, 2, 'mu', 'Anti-1 boost (μ)', appState, controller, [0 1], ...
         'Boost anti-1.');
-    createParamRow(boostGrid, 3, 'k', 'Boost scale k', appState, controller, [0 100], ...
+    createParamRow(boostGrid, 3, 'k', 'Boost scale (k)', appState, controller, [0 100], ...
         'Scala boost.');
-    createParamRow(boostGrid, 4, 'p', 'Boost curve p', appState, controller, [0.5 5], ...
+    createParamRow(boostGrid, 4, 'p', 'Boost curve (p)', appState, controller, [0.5 5], ...
         'Curva boost.');
-    createParamRow(boostGrid, 5, 'lambda', 'Peso boost λ', appState, controller, [0 1], ...
+    createParamRow(boostGrid, 5, 'lambda', 'Peso boost (λ)', appState, controller, [0 1], ...
         'Peso boost nella distribuzione.');
 
+    metaPanel = uipanel(layout, 'Title', 'Dati CSV');
+    metaPanel.Layout.Row = 2;
+    metaGrid = uigridlayout(metaPanel, [5 2]);
+    metaGrid.ColumnWidth = {120, '1x'};
+    metaGrid.RowHeight = {28, 28, 28, 28, '1x'};
+
+    uilabel(metaGrid, 'Text', 'File');
+    fileField = uieditfield(metaGrid, 'text', 'Editable', 'off');
+    uilabel(metaGrid, 'Text', 'Righe');
+    rowsField = uieditfield(metaGrid, 'text', 'Editable', 'off');
+    uilabel(metaGrid, 'Text', 'Colonne');
+    colsArea = uitextarea(metaGrid, 'Editable', 'off');
+    uilabel(metaGrid, 'Text', 'Stats FVM');
+    fvmField = uieditfield(metaGrid, 'text', 'Editable', 'off');
+    uilabel(metaGrid, 'Text', 'Stats QUOT');
+    quotField = uieditfield(metaGrid, 'text', 'Editable', 'off');
+
+    colsArea.Layout.Row = 3;
+    colsArea.Layout.Column = 2;
+
     tunerPanel = uipanel(layout, 'Title', 'Tuner Guidato');
-    tunerPanel.Layout.Row = 2;
+    tunerPanel.Layout.Row = 3;
     tunerGrid = uigridlayout(tunerPanel, [3 2]);
     tunerGrid.RowHeight = {30, 30, 30};
     tunerGrid.ColumnWidth = {'1x', '1x'};
@@ -115,6 +135,8 @@ function createParamRow(grid, row, name, label, appState, controller, range, too
     labelControl = uilabel(grid, 'Text', label, 'FontWeight', 'bold');
     labelControl.Layout.Row = row;
     labelControl.Layout.Column = 1;
+    labelControl.WordWrap = 'on';
+    labelControl.HorizontalAlignment = 'left';
     if nargin >= 8 && strlength(string(tooltip)) > 0
         labelControl.Tooltip = tooltip;
     end
