@@ -101,6 +101,26 @@ function panel = PanelConfig(parent, appState, controller)
         'ValueChangedFcn', @(src, ~) controller.onTunerTarget(src.Value));
     uibutton(tunerGrid, 'Text', 'Applica', 'ButtonPushedFcn', @(~, ~) controller.onTune());
 
+    metaPanel = uipanel(layout, 'Title', 'Dati CSV');
+    metaPanel.Layout.Row = 3;
+    metaGrid = uigridlayout(metaPanel, [5 2]);
+    metaGrid.ColumnWidth = {120, '1x'};
+    metaGrid.RowHeight = {28, 28, 28, 28, '1x'};
+
+    uilabel(metaGrid, 'Text', 'File');
+    fileField = uieditfield(metaGrid, 'text', 'Editable', 'off');
+    uilabel(metaGrid, 'Text', 'Righe');
+    rowsField = uieditfield(metaGrid, 'text', 'Editable', 'off');
+    uilabel(metaGrid, 'Text', 'Colonne');
+    colsArea = uitextarea(metaGrid, 'Editable', 'off');
+    uilabel(metaGrid, 'Text', 'Stats FVM');
+    fvmField = uieditfield(metaGrid, 'text', 'Editable', 'off');
+    uilabel(metaGrid, 'Text', 'Stats QUOT');
+    quotField = uieditfield(metaGrid, 'text', 'Editable', 'off');
+
+    colsArea.Layout.Row = 3;
+    colsArea.Layout.Column = 2;
+
     logPanel = uipanel(layout, 'Title', 'Log');
     logPanel.Layout.Row = 4;
     logGrid = uigridlayout(logPanel, [1 1]);
