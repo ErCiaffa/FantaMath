@@ -1,26 +1,74 @@
 function panel = PanelConfig(parent, appState, controller)
     panel = uipanel(parent, 'Title', 'Parametri', 'FontWeight', 'bold');
-    layout = uigridlayout(panel, [3 1]);
-    layout.RowHeight = {260, 220, '1x'};
+    layout = uigridlayout(panel, [4 1]);
+    layout.RowHeight = {360, 140, 180, '1x'};
     layout.Padding = [10 10 10 10];
 
     tabGroup = uitabgroup(layout);
     tabGroup.Layout.Row = 1;
 
-    tabVal = uitab(tabGroup, 'Title', 'Valutazione');
-    valGrid = uigridlayout(tabVal, [4 4]);
-    valGrid.ColumnWidth = {'1x', 120, 70, 60};
-    valGrid.RowHeight = {32, 32, 32, 32};
-    createParamRow(valGrid, 1, 'phi', 'Peso FVM', appState, controller, [0 100]);
-    createParamRow(valGrid, 2, 'gamma', 'Gamma', appState, controller, [0.5 3]);
-    createParamRow(valGrid, 3, 'Wstar', 'Pool', appState, controller, [500 2000]);
+    tabLeague = uitab(tabGroup, 'Title', 'Lega / Finanza');
+    leagueGrid = uigridlayout(tabLeague, [4 4]);
+    leagueGrid.ColumnWidth = {'1x', 120, 70, 60};
+    leagueGrid.RowHeight = {32, 32, 32, 32};
+    createParamRow(leagueGrid, 1, 'Sq', 'Numero squadre', appState, controller, [4 20], ...
+        'Numero di squadre della lega.');
+    createParamRow(leagueGrid, 2, 'Cstr', 'Crediti iniziali', appState, controller, [100 1000], ...
+        'Crediti iniziali per squadra.');
+    createParamRow(leagueGrid, 3, 'Cmax', 'Cap liquidità', appState, controller, [100 2000], ...
+        'Cap assoluto liquidità lega.');
+    createParamRow(leagueGrid, 4, 'epsilon', 'Margine crescita ε', appState, controller, [0 0.5], ...
+        'Margine crescita capitale consentita.');
 
-    tabSoglie = uitab(tabGroup, 'Title', 'Soglie');
-    soglieGrid = uigridlayout(tabSoglie, [3 4]);
-    soglieGrid.ColumnWidth = {'1x', 120, 70, 60};
-    soglieGrid.RowHeight = {32, 32, 32};
-    createParamRow(soglieGrid, 1, 'pLowF', 'pLow FVM', appState, controller, [0 0.5]);
-    createParamRow(soglieGrid, 2, 'pHighF', 'pHigh FVM', appState, controller, [0.8 1]);
+    tabWeights = uitab(tabGroup, 'Title', 'Pesi Base');
+    weightGrid = uigridlayout(tabWeights, [2 4]);
+    weightGrid.ColumnWidth = {'1x', 120, 70, 60};
+    weightGrid.RowHeight = {32, 32};
+    createParamRow(weightGrid, 1, 'phi', 'Peso FVM φ', appState, controller, [0 100], ...
+        'Peso FVM (0-100).');
+    createParamRow(weightGrid, 2, 'omega', 'Peso QUOT ω', appState, controller, [0 100], ...
+        'Peso QUOT (0-100).');
+
+    tabPercentiles = uitab(tabGroup, 'Title', 'Percentili');
+    pctGrid = uigridlayout(tabPercentiles, [4 4]);
+    pctGrid.ColumnWidth = {'1x', 120, 70, 60};
+    pctGrid.RowHeight = {32, 32, 32, 32};
+    createParamRow(pctGrid, 1, 'pLow_FVM', 'pLow FVM', appState, controller, [0 1], ...
+        'Percentile basso FVM.');
+    createParamRow(pctGrid, 2, 'pHigh_FVM', 'pHigh FVM', appState, controller, [0 1], ...
+        'Percentile alto FVM.');
+    createParamRow(pctGrid, 3, 'pLow_QUOT', 'pLow QUOT', appState, controller, [0 1], ...
+        'Percentile basso QUOT.');
+    createParamRow(pctGrid, 4, 'pHigh_QUOT', 'pHigh QUOT', appState, controller, [0 1], ...
+        'Percentile alto QUOT.');
+
+    tabTransforms = uitab(tabGroup, 'Title', 'Trasformazioni');
+    transGrid = uigridlayout(tabTransforms, [4 4]);
+    transGrid.ColumnWidth = {'1x', 120, 70, 60};
+    transGrid.RowHeight = {32, 32, 32, 32};
+    createCheckRow(transGrid, 1, 'useExp_FVM', 'Abilita exp FVM', appState, controller, ...
+        'Abilita trasformazione esponenziale FVM.');
+    createParamRow(transGrid, 2, 'exp_FVM', 'Esponente FVM', appState, controller, [0.5 5], ...
+        'Esponente/curva FVM.');
+    createCheckRow(transGrid, 3, 'useExp_QUOT', 'Abilita exp QUOT', appState, controller, ...
+        'Abilita trasformazione esponenziale QUOT.');
+    createParamRow(transGrid, 4, 'exp_QUOT', 'Esponente QUOT', appState, controller, [0.5 5], ...
+        'Esponente/curva QUOT.');
+
+    tabBoost = uitab(tabGroup, 'Title', 'Boost');
+    boostGrid = uigridlayout(tabBoost, [5 4]);
+    boostGrid.ColumnWidth = {'1x', 120, 70, 60};
+    boostGrid.RowHeight = {32, 32, 32, 32, 32};
+    createParamRow(boostGrid, 1, 'gamma', 'Esponente γ', appState, controller, [0.5 5], ...
+        'Esponente concentrazione.');
+    createParamRow(boostGrid, 2, 'mu', 'Anti-1 μ', appState, controller, [0 1], ...
+        'Boost anti-1.');
+    createParamRow(boostGrid, 3, 'k', 'Boost scale k', appState, controller, [0 100], ...
+        'Scala boost.');
+    createParamRow(boostGrid, 4, 'p', 'Boost curve p', appState, controller, [0.5 5], ...
+        'Curva boost.');
+    createParamRow(boostGrid, 5, 'lambda', 'Peso boost λ', appState, controller, [0 1], ...
+        'Peso boost nella distribuzione.');
 
     tunerPanel = uipanel(layout, 'Title', 'Tuner Guidato');
     tunerPanel.Layout.Row = 2;
@@ -33,31 +81,103 @@ function panel = PanelConfig(parent, appState, controller)
         'ValueChangedFcn', @(src, ~) controller.onTunerTarget(src.Value));
     uibutton(tunerGrid, 'Text', 'Applica', 'ButtonPushedFcn', @(~, ~) controller.onTune());
 
+    metaPanel = uipanel(layout, 'Title', 'Dati CSV');
+    metaPanel.Layout.Row = 3;
+    metaGrid = uigridlayout(metaPanel, [5 2]);
+    metaGrid.ColumnWidth = {120, '1x'};
+    metaGrid.RowHeight = {28, 28, 28, 28, '1x'};
+
+    uilabel(metaGrid, 'Text', 'File');
+    fileField = uieditfield(metaGrid, 'text', 'Editable', 'off');
+    uilabel(metaGrid, 'Text', 'Righe');
+    rowsField = uieditfield(metaGrid, 'text', 'Editable', 'off');
+    uilabel(metaGrid, 'Text', 'Colonne');
+    colsArea = uitextarea(metaGrid, 'Editable', 'off');
+    uilabel(metaGrid, 'Text', 'Stats FVM');
+    fvmField = uieditfield(metaGrid, 'text', 'Editable', 'off');
+    uilabel(metaGrid, 'Text', 'Stats QUOT');
+    quotField = uieditfield(metaGrid, 'text', 'Editable', 'off');
+
+    colsArea.Layout.Row = 3;
+    colsArea.Layout.Column = 2;
+
     logPanel = uipanel(layout, 'Title', 'Log');
-    logPanel.Layout.Row = 3;
+    logPanel.Layout.Row = 4;
     logGrid = uigridlayout(logPanel, [1 1]);
     logArea = uitextarea(logGrid, 'Editable', 'off');
     logArea.Layout.Row = 1;
     logArea.Layout.Column = 1;
     controller.onLogUpdate = @(lines) set(logArea, 'Value', lines);
+    controller.onMetaUpdate = @(meta) updateMeta(fileField, rowsField, colsArea, fvmField, quotField, meta);
 end
 
-function createParamRow(grid, row, name, label, appState, controller, range)
+function createParamRow(grid, row, name, label, appState, controller, range, tooltip)
     labelControl = uilabel(grid, 'Text', label, 'FontWeight', 'bold');
     labelControl.Layout.Row = row;
     labelControl.Layout.Column = 1;
+    if nargin >= 8 && strlength(string(tooltip)) > 0
+        labelControl.Tooltip = tooltip;
+    end
     slider = uislider(grid, 'Limits', range, 'Value', appState.params.(name));
     slider.Layout.Row = row;
     slider.Layout.Column = 2;
     editField = uieditfield(grid, 'numeric', 'Value', appState.params.(name));
     editField.Layout.Row = row;
     editField.Layout.Column = 3;
+    if nargin >= 8 && strlength(string(tooltip)) > 0
+        slider.Tooltip = tooltip;
+        editField.Tooltip = tooltip;
+    end
 
-    slider.ValueChangedFcn = @(src, ~) controller.onParamChange(name, src.Value);
-    editField.ValueChangedFcn = @(src, ~) controller.onParamChange(name, src.Value);
+    slider.ValueChangedFcn = @(src, ~) controller.onParamChange(name, src.Value, range);
+    editField.ValueChangedFcn = @(src, ~) controller.onParamChange(name, src.Value, range);
 
     lock = uicheckbox(grid, 'Text', 'Lock', 'Value', appState.paramsLock.(name));
     lock.Layout.Row = row;
     lock.Layout.Column = 4;
     lock.ValueChangedFcn = @(src, ~) controller.onLockChange(name, src.Value);
+end
+
+function createCheckRow(grid, row, name, label, appState, controller, tooltip)
+    labelControl = uilabel(grid, 'Text', label, 'FontWeight', 'bold');
+    labelControl.Layout.Row = row;
+    labelControl.Layout.Column = 1;
+    checkbox = uicheckbox(grid, 'Text', '', 'Value', appState.params.(name));
+    checkbox.Layout.Row = row;
+    checkbox.Layout.Column = 2;
+    checkbox.ValueChangedFcn = @(src, ~) controller.onParamChange(name, src.Value, []);
+    if nargin >= 7 && strlength(string(tooltip)) > 0
+        checkbox.Tooltip = tooltip;
+        labelControl.Tooltip = tooltip;
+    end
+    lock = uicheckbox(grid, 'Text', 'Lock', 'Value', appState.paramsLock.(name));
+    lock.Layout.Row = row;
+    lock.Layout.Column = 4;
+    lock.ValueChangedFcn = @(src, ~) controller.onLockChange(name, src.Value);
+end
+
+function updateMeta(fileField, rowsField, colsArea, fvmField, quotField, meta)
+    if isempty(meta)
+        return;
+    end
+    fileField.Value = string(meta.fileName);
+    rowsField.Value = sprintf('%d', meta.rowCount);
+    colsArea.Value = string(meta.columnsMapped);
+    fvmField.Value = formatStats(meta.stats, 'FVM');
+    quotField.Value = formatStats(meta.stats, 'QUOT');
+end
+
+function text = formatStats(stats, key)
+    if ~isfield(stats, key)
+        text = '';
+        return;
+    end
+    block = stats.(key);
+    if ~isfield(block, 'min') || ~isfield(stats, 'nanPct') || ~isfield(stats.nanPct, key)
+        text = '';
+        return;
+    end
+    nanPct = stats.nanPct.(key);
+    text = sprintf('min %.2f | max %.2f | mean %.2f | NaN %.1f%%', ...
+        block.min, block.max, block.mean, nanPct);
 end
