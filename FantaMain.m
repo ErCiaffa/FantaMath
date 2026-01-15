@@ -1,6 +1,6 @@
 function FantaMain()
     appState = AppState();
-    appState = FantaIO.loadCSV(appState, '');
+    appState.addLog('Nessun CSV caricato. Usa "Carica CSV" per iniziare.');
 
     fig = uifigure('Name', 'FantaTuner Pro', 'Position', [50 50 1500 900]);
     fig.WindowState = 'maximized';
@@ -21,7 +21,7 @@ function FantaMain()
 
     main = uigridlayout(root, [1 3]);
     main.Layout.Row = 2;
-    main.ColumnWidth = {360, '1x', 360};
+    main.ColumnWidth = {420, '1x', 360};
     main.ColumnSpacing = 10;
     panelConfig = PanelConfig(main, appState, controller);
     panelConfig.Layout.Column = 1;
@@ -55,10 +55,25 @@ function FantaMain()
         controller.onKpiUpdate = [];
         controller.onAdviceUpdate = [];
         controller.onTeamsUpdate = [];
+        controller.onMetaUpdate = [];
     end
 
-    function onParamChange(name, value)
-        appState.params.(name) = value;
+    function onParamChange(name, value, range)
+        if isfield(appState.paramsLock, name) && appState.paramsLock.(name)
+            appState.addLog(sprintf('Parametro %s bloccato, modifica ignorata.', name), 'WARN');
+            updateApp();
+            return;
+        end
+        correctedValue = value;
+        if nargin >= 3 && ~isempty(range)
+            minVal = range(1);
+            maxVal = range(2);
+            if correctedValue < minVal || correctedValue > maxVal
+                correctedValue = min(max(correctedValue, minVal), maxVal);
+                appState.addLog(sprintf('Parametro %s fuori range, corretto a %.4g.', name, correctedValue), 'WARN');
+            end
+        end
+        appState.params.(name) = correctedValue;
         appState.markDirty({'params', 'results'});
         updateApp();
     end
@@ -95,45 +110,79 @@ function FantaMain()
     function onExport()
         [file, path] = uiputfile('*.xlsx', 'Export Excel');
         if isequal(file, 0)
+            appState.addLog('Export Excel annullato.');
+            updateApp();
             return;
         end
         FantaIO.exportExcel(appState, fullfile(path, file));
-        appState.log{end+1, 1} = 'Export Excel completato.';
+        appState.addLog('Export Excel completato.');
         updateApp();
     end
 
     function onLoadCSV()
         [file, path] = uigetfile({'*.csv;*.xlsx', 'CSV or Excel'});
         if isequal(file, 0)
+            appState.addLog('Caricamento annullato.');
+            updateApp();
             return;
         end
-        appState = FantaIO.loadCSV(appState, fullfile(path, file));
-        updateApp();
+        try
+            filePath = fullfile(path, file);
+            appState.addLog(sprintf('Caricamento CSV: %s', filePath));
+            appState = FantaIO.loadCSV(appState, filePath);
+            appState.dirty.data = true;
+            appState.dirty.results = true;
+            updateApp();
+        catch ME
+            appState.addLog(ME.message, 'ERROR');
+            stackLines = arrayfun(@(s) sprintf('%s:%d', s.file, s.line), ME.stack, 'UniformOutput', false);
+            for i = 1:numel(stackLines)
+                appState.addLog(stackLines{i}, 'ERROR');
+            end
+            uialert(fig, ME.message, 'Errore caricamento CSV');
+            updateApp();
+        end
     end
 
     function onSaveConfig()
         [file, path] = uiputfile('*.json', 'Salva Config');
         if isequal(file, 0)
+            appState.addLog('Salvataggio config annullato.');
+            updateApp();
             return;
         end
         FantaIO.saveConfig(appState, fullfile(path, file));
-        appState.log{end+1, 1} = 'Config salvata.';
+        appState.addLog('Config salvata.');
         updateApp();
     end
 
     function onLoadConfig()
         [file, path] = uigetfile('*.json', 'Carica Config');
         if isequal(file, 0)
+            appState.addLog('Caricamento config annullato.');
+            updateApp();
             return;
         end
-        appState = FantaIO.loadConfig(appState, fullfile(path, file));
-        updateApp();
+        try
+            appState = FantaIO.loadConfig(appState, fullfile(path, file));
+            appState.addLog('Config caricata.');
+            updateApp();
+        catch ME
+            appState.addLog(ME.message, 'ERROR');
+            stackLines = arrayfun(@(s) sprintf('%s:%d', s.file, s.line), ME.stack, 'UniformOutput', false);
+            for i = 1:numel(stackLines)
+                appState.addLog(stackLines{i}, 'ERROR');
+            end
+            uialert(fig, ME.message, 'Errore caricamento config');
+            updateApp();
+        end
     end
 
     function onResetDefaults()
         appState.params = AppState.defaultParams();
         appState.paramsLock = AppState.defaultParamLocks(appState.params);
         appState.markDirty({'params', 'results', 'ui'});
+        appState.addLog('Parametri ripristinati ai valori di default.');
         updateApp();
     end
 
@@ -156,6 +205,9 @@ function FantaMain()
             appState = FantaManager.recalcTeams(appState);
             appState = recalcRanking(appState);
             appState = FantaHelper.recalcKPI(appState);
+            if isempty(appState.results.listone)
+                appState.addLog('Listone vuoto: verifica colonne CSV o parametri.', 'WARN');
+            end
             appState.clearDirty({'data', 'params'});
         end
 
@@ -196,6 +248,10 @@ function FantaMain()
             viewModel = buildViewModel(appState, viewId);
             controller.onChartUpdate(viewModel, viewId);
         end
+
+        if ~isempty(controller.onMetaUpdate)
+            controller.onMetaUpdate(appState.data.meta);
+        end
     end
 end
 
@@ -206,7 +262,7 @@ function listone = applySearch(listone, selection)
     if isfield(selection, 'filters') && isfield(selection.filters, 'search')
         query = string(selection.filters.search);
         if strlength(query) > 0
-            mask = contains(lower(listone.Nome), lower(query));
+            mask = contains(lower(listone.Name), lower(query));
             listone = listone(mask, :);
         end
     end
@@ -230,14 +286,14 @@ function viewModel = buildViewModel(state, viewId)
         case 'Scatter'
             viewModel.x = listone.FVM;
             viewModel.y = listone.ValueFinal;
-            viewModel.c = listone.Quot;
+            viewModel.c = listone.QUOT;
             viewModel.xLabel = 'FVM';
             viewModel.yLabel = 'Valore Finale';
         case 'Istogramma'
             viewModel.values = listone.ValueFinal;
             viewModel.xLabel = 'Valore Finale';
         case 'Heatmap'
-            roles = string(listone.Ruolo);
+            roles = string(listone.Role);
             uniqueRoles = unique(roles);
             counts = zeros(numel(uniqueRoles));
             for i = 1:numel(uniqueRoles)
@@ -262,12 +318,12 @@ function state = recalcRanking(state)
         return;
     end
     data = state.results.listone;
-    teams = unique(data.FantaSquadra);
+    teams = unique(data.Team);
     ranking = table('Size', [numel(teams), 2], 'VariableTypes', {'string', 'double'}, ...
         'VariableNames', {'Team', 'TotalValue'});
     for i = 1:numel(teams)
         team = teams(i);
-        mask = data.FantaSquadra == team;
+        mask = data.Team == team;
         ranking.Team(i) = team;
         ranking.TotalValue(i) = sum(data.ValueFinal(mask), 'omitnan');
     end

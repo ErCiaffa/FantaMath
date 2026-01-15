@@ -28,7 +28,11 @@ end
 
 function updateTable(tableHandle, axesHandle, data)
     tableHandle.Visible = 'on';
-    tableHandle.Data = data;
+    if isempty(data)
+        tableHandle.Data = buildPlaceholderTable('Nessun CSV caricato.');
+    else
+        tableHandle.Data = data;
+    end
     axesHandle.Visible = 'off';
 end
 
@@ -36,6 +40,18 @@ function updateChart(ax, tableHandle, viewModel, mode)
     cla(ax);
     ax.Visible = 'on';
     tableHandle.Visible = 'off';
+    if isempty(viewModel) || (~isfield(viewModel, 'x') && ~isfield(viewModel, 'values'))
+        showEmptyChart(ax, 'Carica CSV per vedere i grafici.');
+        return;
+    end
+    if isfield(viewModel, 'x') && isempty(viewModel.x) && isfield(viewModel, 'values') && isempty(viewModel.values)
+        showEmptyChart(ax, 'Carica CSV per vedere i grafici.');
+        return;
+    end
+    if isfield(viewModel, 'matrix') && isempty(viewModel.matrix)
+        showEmptyChart(ax, 'Carica CSV per vedere i grafici.');
+        return;
+    end
     switch mode
         case 'Scatter'
             FantaGraph.drawScatter(ax, viewModel, struct('title', 'Scatter'));
@@ -46,4 +62,15 @@ function updateChart(ax, tableHandle, viewModel, mode)
         otherwise
             ax.Visible = 'off';
     end
+end
+
+function placeholder = buildPlaceholderTable(text)
+    placeholder = table(string(text), 'VariableNames', {'Messaggio'});
+end
+
+function showEmptyChart(ax, textValue)
+    ax.Visible = 'on';
+    ax.XTick = [];
+    ax.YTick = [];
+    text(ax, 0.5, 0.5, textValue, 'HorizontalAlignment', 'center', 'FontWeight', 'bold');
 end

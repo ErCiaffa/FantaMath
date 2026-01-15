@@ -21,16 +21,16 @@ classdef FantaManager
                 state.teams.table = table();
                 return;
             end
-            teams = unique(players.FantaSquadra);
+            teams = unique(players.Team);
             teamTable = table('Size', [numel(teams), 5], ...
                 'VariableTypes', {'string', 'double', 'double', 'double', 'double'}, ...
                 'VariableNames', {'Team', 'Bank', 'RosterValue', 'ReleaseValue', 'BonusMalus'});
 
             for i = 1:numel(teams)
                 team = teams(i);
-                mask = players.FantaSquadra == team;
+                mask = players.Team == team;
                 rosterValue = sum(players.FVM(mask), 'omitnan');
-                releaseValue = sum(players.Costo(mask), 'omitnan');
+                releaseValue = sum(players.Cost(mask), 'omitnan');
                 teamTable.Team(i) = team;
                 teamTable.Bank(i) = 0;
                 teamTable.RosterValue(i) = rosterValue;
@@ -49,7 +49,7 @@ classdef FantaManager
             end
             idx = state.data.players.ID == tx.playerId;
             if any(idx)
-                state.data.players.FantaSquadra(idx) = "";
+                state.data.players.Team(idx) = "";
             end
         end
 
