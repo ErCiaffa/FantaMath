@@ -17,7 +17,7 @@ classdef AppState < handle
             obj.params = AppState.defaultParams();
             obj.paramsLock = AppState.defaultParamLocks(obj.params);
             obj.results = struct('listone', table(), 'ranking', table(), 'kpi', struct());
-            obj.ui = struct('selection', struct('viewId', 'Listone', 'filters', struct()));
+            obj.ui = struct('selection', struct('viewId', 'Listone', 'filters', struct(), 'team', ""));
             obj.log = {};
             obj.dirty = struct('data', true, 'params', true, 'teams', true, 'results', true, 'ui', true);
         end
@@ -71,6 +71,10 @@ classdef AppState < handle
             params.k = 20.00;
             params.p = 2.00;
             params.lambda = 0.10;
+            params.wr_P = 1.10;
+            params.wr_D = 1.00;
+            params.wr_C = 1.00;
+            params.wr_A = 1.40;
         end
 
         function locks = defaultParamLocks(params)

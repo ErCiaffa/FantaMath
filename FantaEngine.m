@@ -29,6 +29,8 @@ classdef FantaEngine
 
             valueFinal = params.Cstr .* (weightFvm * fvmNorm + weightQuot * quotNorm);
             valueFinal = valueFinal .* params.gamma;
+            roleWeights = FantaEngine.roleWeights(players.Role, params);
+            valueFinal = valueFinal .* roleWeights;
 
             listone = players;
             listone.ValueFinal = valueFinal;
@@ -40,6 +42,15 @@ classdef FantaEngine
     end
 
     methods(Static, Access = private)
+        function weights = roleWeights(roles, params)
+            roles = upper(string(roles));
+            weights = ones(size(roles));
+            weights(startsWith(roles, "P")) = params.wr_P;
+            weights(startsWith(roles, "D")) = params.wr_D;
+            weights(startsWith(roles, "C")) = params.wr_C;
+            weights(startsWith(roles, "A")) = params.wr_A;
+        end
+
         function normVal = normalize(values, pLow, pHigh)
             values = double(values);
             normVal = zeros(size(values));

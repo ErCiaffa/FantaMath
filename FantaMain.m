@@ -1,6 +1,7 @@
 function FantaMain()
     appState = AppState();
-    appState.addLog('Nessun CSV caricato. Usa "Carica CSV" per iniziare.');
+    appState.addLog('Avvio applicazione.');
+    appState = tryAutoLoad(appState);
 
     fig = uifigure('Name', 'FantaTuner Pro', 'Position', [50 50 1500 900]);
     fig.WindowState = 'maximized';
@@ -56,6 +57,9 @@ function FantaMain()
         controller.onAdviceUpdate = [];
         controller.onTeamsUpdate = [];
         controller.onMetaUpdate = [];
+        controller.onRosterUpdate = [];
+        controller.onReleasePlayer = @onReleasePlayer;
+        controller.onTeamSelect = @onTeamSelect;
     end
 
     function onParamChange(name, value, range)
@@ -105,6 +109,30 @@ function FantaMain()
         appState.teams.table.(colName)(row) = evt.NewData;
         appState.markDirty({'teams'});
         updateApp();
+    end
+
+    function onTeamSelect(team)
+        appState.ui.selection.team = string(team);
+        appState.markDirty({'ui'});
+        updateApp();
+    end
+
+    function onReleasePlayer(playerId)
+        if isnan(playerId)
+            appState.addLog('Seleziona un giocatore per simulare lo svincolo.', 'WARN');
+            updateApp();
+            return;
+        end
+        tx = struct('type', 'svincolo', 'playerId', playerId);
+        try
+            appState = FantaManager.applyTransaction(appState, tx);
+            appState.addLog(sprintf('Svincolo simulato per playerId %d.', playerId));
+            updateApp();
+        catch ME
+            appState.addLog(ME.message, 'ERROR');
+            uialert(fig, ME.message, 'Errore svincolo');
+            updateApp();
+        end
     end
 
     function onExport()
@@ -219,6 +247,20 @@ function FantaMain()
         updatePanels();
     end
 
+    function state = tryAutoLoad(state)
+        defaultFile = 'listone.csv';
+        if isfile(defaultFile)
+            try
+                state.addLog(sprintf('Caricamento automatico: %s', defaultFile));
+                state = FantaIO.loadCSV(state, defaultFile);
+            catch ME
+                state.addLog(ME.message, 'ERROR');
+            end
+        else
+            state.addLog('Nessun CSV caricato. Usa "Carica CSV" per iniziare.');
+        end
+    end
+
     function updatePanels()
         if ~isempty(controller.onLogUpdate)
             controller.onLogUpdate(string(appState.log));
@@ -251,6 +293,11 @@ function FantaMain()
 
         if ~isempty(controller.onMetaUpdate)
             controller.onMetaUpdate(appState.data.meta);
+        end
+
+        if ~isempty(controller.onRosterUpdate)
+            [rosterData, teams, selectedTeam] = buildRoster(appState);
+            controller.onRosterUpdate(rosterData, teams, selectedTeam);
         end
     end
 end
@@ -329,4 +376,25 @@ function state = recalcRanking(state)
     end
     ranking = sortrows(ranking, 'TotalValue', 'descend');
     state.results.ranking = ranking;
+end
+
+function [rosterData, teams, selectedTeam] = buildRoster(state)
+    players = state.data.players;
+    if isempty(players)
+        rosterData = table();
+        teams = strings(0, 1);
+        selectedTeam = "";
+        return;
+    end
+    teams = unique(players.Team);
+    selectedTeam = state.ui.selection.team;
+    if strlength(selectedTeam) == 0 && ~isempty(teams)
+        selectedTeam = teams(1);
+    end
+    mask = players.Team == selectedTeam;
+    rosterData = players(mask, :);
+    if ~isempty(rosterData)
+        keepCols = intersect(rosterData.Properties.VariableNames, {'ID', 'Name', 'Role', 'FVM', 'QUOT', 'Cost', 'Team'}, 'stable');
+        rosterData = rosterData(:, keepCols);
+    end
 end

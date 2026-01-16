@@ -70,6 +70,19 @@ function panel = PanelConfig(parent, appState, controller)
     createParamRow(boostGrid, 5, 'lambda', 'Peso boost (λ)', appState, controller, [0 1], ...
         'Peso boost nella distribuzione.');
 
+    tabRoles = uitab(tabGroup, 'Title', 'Ruoli');
+    roleGrid = uigridlayout(tabRoles, [4 4]);
+    roleGrid.ColumnWidth = {180, 120, 70, 60};
+    roleGrid.RowHeight = {32, 32, 32, 32};
+    createParamRow(roleGrid, 1, 'wr_P', 'Peso Portieri (P)', appState, controller, [0.5 2], ...
+        'Moltiplicatore per portieri.');
+    createParamRow(roleGrid, 2, 'wr_D', 'Peso Difensori (D)', appState, controller, [0.5 2], ...
+        'Moltiplicatore per difensori.');
+    createParamRow(roleGrid, 3, 'wr_C', 'Peso Centroc. (C)', appState, controller, [0.5 2], ...
+        'Moltiplicatore per centrocampisti.');
+    createParamRow(roleGrid, 4, 'wr_A', 'Peso Attaccanti (A)', appState, controller, [0.5 2], ...
+        'Moltiplicatore per attaccanti.');
+
     metaPanel = uipanel(layout, 'Title', 'Dati CSV');
     metaPanel.Layout.Row = 2;
     metaGrid = uigridlayout(metaPanel, [5 2]);
