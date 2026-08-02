@@ -161,4 +161,16 @@ questo limite di stabilità esplicitamente accettato, non ignorato.
   ogni centrocampista) — convertirla in crediti ora cristallizzerebbe quella distorsione in
   un valore economico reale.
 
+- **2026-08-02**: scarsità ruolo (`roleDemand`/`roleScarcity`/`roleFactor`, portati da
+  FantaMath) collegati a `LeagueState.recomputeScores`. Parametri: `qw=1` (penalizza panchine
+  senza essere estremo — verificato: la maggior parte dei ruoli ha pochi giocatori scarsi tra
+  i posseduti, eccetto Por con 25% di riserve), `eta=1` (lineare), `mixOwned=1` (solo
+  posseduti), `nmax=3`/`beta=0.2` (bonus duttilità multi-ruolo, scelto da Claude su richiesta
+  esplicita). Verificato sui dati reali: Dc/M/Por più scarsi, C/T più abbondanti, B
+  (Braccetto) ora scarso come atteso dalla fix di roleDemand. RoleFactor dipende solo dal
+  ruolo (non dalla qualità del giocatore) — per design, la differenziazione per bravura resta
+  in S, si combinano nel prossimo step (`assembleWeight`, non ancora costruito).
+- **Prossimo**: età (`ageWeight`), poi floor, poi conversione finale in crediti
+  (`assembleWeight`→`auctionPrice`/`releaseValue`).
+
 *(continua ad ogni nuova decisione)*
