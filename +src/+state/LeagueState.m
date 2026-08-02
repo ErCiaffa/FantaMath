@@ -72,6 +72,53 @@ classdef LeagueState
             state.teams.table = [state.teams.table; newRow];
         end
 
+        function state = setBankOverride(state, teamName, value)
+            arguments
+                state struct
+                teamName (1,1) string
+                value (1,1) double
+            end
+            idx = find(state.teams.table.name == teamName, 1);
+            if isempty(idx)
+                error('FantaManager:transaction:unknownTeam', ...
+                    'Squadra "%s" non trovata.', teamName);
+            end
+            state.teams.table.bankOverride(idx) = value;
+        end
+
+        function bank = bankResiduoVector(state)
+            n = height(state.teams.table);
+            bank = zeros(n, 1);
+            for i = 1:n
+                if isfinite(state.teams.table.bankOverride(i))
+                    bank(i) = state.teams.table.bankOverride(i);
+                    continue
+                end
+                mask = state.teams.transactions.Team == state.teams.table.name(i);
+                bank(i) = state.teams.table.creditiIniziali(i) + sum(state.teams.transactions.Amount(mask));
+            end
+        end
+
+        function state = applyBonusMalus(state, teamName, amount, motivo)
+            arguments
+                state struct
+                teamName (1,1) string
+                amount (1,1) double {mustBeFinite}
+                motivo (1,1) string
+            end
+            if ~any(state.teams.table.name == teamName)
+                error('FantaManager:transaction:unknownTeam', ...
+                    'Squadra "%s" non trovata nello stato corrente.', teamName);
+            end
+            if strlength(strtrim(motivo)) == 0
+                error('FantaManager:transaction:missingMotivo', ...
+                    'Il bonus o malus richiede una motivazione non vuota.');
+            end
+            newRow = table(datetime('now'), NaN, "", teamName, "bonus", false, amount, motivo, ...
+                'VariableNames', {'Timestamp', 'PlayerId', 'PlayerName', 'Team', 'Type', 'Mandatory', 'Amount', 'Motivo'});
+            state.teams.transactions = [state.teams.transactions; newRow];
+        end
+
         function saveState(state, matPath)
             arguments
                 state struct
