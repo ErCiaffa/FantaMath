@@ -32,6 +32,19 @@ classdef tLeagueStateBankTest < matlab.unittest.TestCase
             testCase.verifyEqual(bank, 515);
         end
 
+        function bankOverrideAndBonusMalusAreAdditiveNotMasked(testCase)
+            state = src.state.LeagueState.empty();
+            state = src.state.LeagueState.addTeam(state, "Squadra A", 500);
+            state = src.state.LeagueState.setBankOverride(state, "Squadra A", 340);
+            state = src.state.LeagueState.applyBonusMalus(state, "Squadra A", 20, "Premio classifica");
+
+            bank = src.state.LeagueState.bankResiduoVector(state);
+            testCase.verifyEqual(bank, 360);
+
+            bonusMalus = src.state.LeagueState.bonusMalusSumVector(state);
+            testCase.verifyEqual(bonusMalus, 20);
+        end
+
         function applyBonusMalusRejectsEmptyMotivo(testCase)
             state = src.state.LeagueState.empty();
             state = src.state.LeagueState.addTeam(state, "Squadra A", 500);

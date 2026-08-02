@@ -86,17 +86,25 @@ classdef LeagueState
             state.teams.table.bankOverride(idx) = value;
         end
 
-        function bank = bankResiduoVector(state)
+        function sums = bonusMalusSumVector(state)
             n = height(state.teams.table);
-            bank = zeros(n, 1);
+            sums = zeros(n, 1);
             for i = 1:n
-                if isfinite(state.teams.table.bankOverride(i))
-                    bank(i) = state.teams.table.bankOverride(i);
-                    continue
-                end
                 mask = state.teams.transactions.Team == state.teams.table.name(i);
-                bank(i) = state.teams.table.creditiIniziali(i) + sum(state.teams.transactions.Amount(mask));
+                sums(i) = sum(state.teams.transactions.Amount(mask));
             end
+        end
+
+        function bank = bankResiduoVector(state)
+            % Residuo = banca base (bankOverride if set, else creditiIniziali) + the full
+            % bonus/malus ledger sum, ALWAYS additive -- an edited banca never hides the
+            % bonus/malus history (2026-08-02 correction: the previous "override replaces
+            % everything" behavior was confusing in the UI).
+            n = height(state.teams.table);
+            base = state.teams.table.creditiIniziali;
+            overrideMask = isfinite(state.teams.table.bankOverride);
+            base(overrideMask) = state.teams.table.bankOverride(overrideMask);
+            bank = base + src.state.LeagueState.bonusMalusSumVector(state);
         end
 
         function state = applyBonusMalus(state, teamName, amount, motivo)
