@@ -98,6 +98,7 @@ function state = applyEntry(state, entry)
             end
 
             state = src.state.LeagueState.recomputeTeamValue(state);
+            state = src.state.LeagueState.recomputeScores(state);
             state.meta.lastCsvPath = string(entry.payload.csvPath);
             state.meta.lastCsvLoadedAt = datetime('now');
 
@@ -107,6 +108,10 @@ function state = applyEntry(state, entry)
         case "applyBonusMalus"
             state = src.state.LeagueState.applyBonusMalus(state, string(entry.payload.teamName), ...
                 entry.payload.amount, string(entry.payload.motivo));
+
+        case "setFormulaParams"
+            state = src.state.LeagueState.setFormulaParams(state, entry.payload.phi, entry.payload.alphaF, ...
+                entry.payload.alphaQ, entry.payload.pLow, entry.payload.pHigh);
 
         otherwise
             error('FantaManager:queue:unknownType', 'Tipo azione sconosciuto: "%s".', entry.type);

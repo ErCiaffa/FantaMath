@@ -13,6 +13,8 @@ function exportLegaJson(state, jsonPath)
         'lastCsvLoadedAt', encodeDatetime(state.meta.lastCsvLoadedAt));
     out.epsilon = state.epsilon;
     out.players = table2struct(state.players);
+    out.params = state.params;
+    out.scores = table2struct(state.scores);
 
     out.teams = struct();
     teamsTable = state.teams.table;

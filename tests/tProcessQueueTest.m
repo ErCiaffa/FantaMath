@@ -39,6 +39,29 @@ classdef tProcessQueueTest < matlab.unittest.TestCase
             testCase.verifyNotEmpty(char(resultQueue.error));
         end
 
+        function setFormulaParamsEntryRecomputesScores(testCase)
+            work = testCase.createWorkDir();
+            csvFile = fullfile(fileparts(mfilename('fullpath')), 'fixtures', 'listone_min.csv');
+            createQueue = {struct('id', "c1", 'type', "createLeague", 'status', "pending", ...
+                'payload', struct('csvPath', string(csvFile), 'epsilon', 0.05, ...
+                    'credits', [struct('teamName', "LAMINCHIADURA", 'value', 500); ...
+                                struct('teamName', "Eintracht Piangoforte", 'value', 480)]))};
+            testCase.writeQueue(work.queuePath, createQueue);
+            src.app.processQueue(work.queuePath, work.statePath, work.jsonPath);
+
+            paramsQueue = {struct('id', "p1", 'type', "setFormulaParams", 'status', "pending", ...
+                'payload', struct('phi', 1, 'alphaF', 0.0005, 'alphaQ', 0.0005, 'pLow', 0, 'pHigh', 1))};
+            testCase.writeQueue(work.queuePath, paramsQueue);
+            src.app.processQueue(work.queuePath, work.statePath, work.jsonPath);
+
+            resultQueue = jsondecode(fileread(work.queuePath));
+            testCase.verifyEqual(string(resultQueue.status), "applied");
+
+            state = src.state.LeagueState.loadState(work.statePath);
+            testCase.verifyEqual(state.params.phi, 1);
+            testCase.verifyEqual(state.scores.score, state.scores.fScore, 'AbsTol', 1e-12);
+        end
+
         function missingQueueFileStillExportsCurrentState(testCase)
             work = testCase.createWorkDir();
             src.app.processQueue(work.queuePath, work.statePath, work.jsonPath);

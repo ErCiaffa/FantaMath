@@ -35,6 +35,21 @@ classdef tExportLegaJsonTest < matlab.unittest.TestCase
 
             testCase.verifyEqual(decoded.players, []);
             testCase.verifyEqual(decoded.teams.table, []);
+            testCase.verifyEqual(decoded.scores, []);
+        end
+
+        function exportsFormulaParamsAndScores(testCase)
+            csvFile = fullfile(fileparts(mfilename('fullpath')), 'fixtures', 'listone_min.csv');
+            creditiMap = containers.Map({'LAMINCHIADURA', 'Eintracht Piangoforte'}, {500, 480});
+            state = src.state.LeagueState.createFromCsv(string(csvFile), creditiMap, 0.05);
+
+            jsonFile = fullfile(tempdir, "tExportLegaJsonTest_scores.json");
+            testCase.addTeardown(@() delete(jsonFile));
+            src.io.exportLegaJson(state, string(jsonFile));
+            decoded = jsondecode(fileread(jsonFile));
+
+            testCase.verifyEqual(decoded.params.phi, 0.5);
+            testCase.verifyEqual(numel(decoded.scores), height(state.players));
         end
     end
 end
