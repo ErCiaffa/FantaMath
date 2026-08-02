@@ -194,7 +194,44 @@ richiederebbe ancorare i percentili a un riferimento fisso esterno al pool corre
 distribuzione storica multi-stagione), non al listone della singola settimana — lavoro
 architetturale più grande, da pianificare a parte, non fatto oggi.
 
+## 6d. Verdetto finale sul metodo rank-esponenziale: scartato
+
+Test decisivo: confrontato il salto di punteggio fra coppie di giocatori adiacenti, in una
+zona affollata del pool (molti giocatori con FVM quasi identico) e in una zona rada (top
+player, differenze reali grandi).
+
+```
+Zona affollata (32 giocatori tutti a FVM=12):
+  Luperto FVM=12 -> Gandelman FVM=13   (gap reale: 1 punto)
+  salto min-max (attuale): 0.0141      salto rank-esponenziale: 0.1519
+
+Zona rada (top player):
+  Pulisic FVM=100 -> Svilar FVM=105    (gap reale: 5 punti, 5x piu' grande)
+  salto min-max (attuale): 0.0089      salto rank-esponenziale: 0.1535
+```
+
+Il metodo rank-esponenziale dà **lo stesso salto di punteggio** a Gandelman (1 punto di
+differenza reale, ma è uscito da un affollamento di 32 giocatori identici) e a Svilar (5
+punti di differenza reale, un gap 5 volte più grande). Il rank premia "quanti giocatori hai
+superato in classifica", non "quanto sei davvero più forte" — la sua "garanzia" di scalini
+2-3x consistenti è una separazione **artificiale**, imposta dalla densità del pool in quella
+zona, non dai veri divari di qualità. È esattamente il rischio di "troppa separazione" da
+evitare.
+
+**Verdetto: il metodo rank-esponenziale è scartato.** Nonostante risolvesse elegantemente il
+vincolo "scalini 2-3x ovunque", lo fa al prezzo di ignorare il valore reale sottostante — un
+compromesso peggiore, non migliore, del metodo attuale.
+
+**Si resta sul metodo min-max + compressione logaritmica** (`normalizeScore.m`, invariato),
+con `αF=2`, `αQ=0.08`, `φ=0.40` — già applicati. Rispetta la magnitudine reale dei dati (non
+solo l'ordine), è misurabilmente più stabile del rank-esponenziale, e soddisfa già il
+vincolo principale (top/mediano = 2.34, dentro banda 2-3x) senza introdurre distorsioni
+artificiali legate alla densità locale del pool.
+
 ## 7. Raccomandazione finale
+
+**Metodo**: min-max + compressione logaritmica (`normalizeScore.m`), invariato — il metodo
+alternativo rank-esponenziale (§6c/6d) è stato progettato, testato e scartato dopo verifica.
 
 | Parametro | Valore precedente | Valore raccomandato | Perché |
 |---|---|---|---|
