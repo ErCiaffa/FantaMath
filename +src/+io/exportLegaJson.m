@@ -33,12 +33,18 @@ function exportLegaJson(state, jsonPath)
         mkdir(folder);
     end
 
-    fid = fopen(jsonPath, 'w');
+    % Atomic write: write to a temp file then move into place, so a concurrent HTTP read
+    % (FastAPI's GET /api/state) never observes a partially-written/empty file (2026-08-03
+    % fix: this race caused intermittent "Internal Server Error" / JSON parse failures in
+    % the browser whenever a poll landed mid-write).
+    tempPath = jsonPath + "." + string(java.util.UUID.randomUUID()) + ".tmp";
+    fid = fopen(tempPath, 'w');
     if fid == -1
-        error('FantaManager:export:cannotWrite', 'Impossibile scrivere "%s".', jsonPath);
+        error('FantaManager:export:cannotWrite', 'Impossibile scrivere "%s".', tempPath);
     end
     fwrite(fid, jsonencode(out), 'char');
     fclose(fid);
+    movefile(tempPath, jsonPath, 'f');
 end
 
 function s = encodeDatetime(dt)
