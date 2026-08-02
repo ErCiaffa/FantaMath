@@ -11,6 +11,13 @@ classdef tLoadListoneTest < matlab.unittest.TestCase
             testCase.verifyEqual(players.roleTokens{3}, ["B"; "Ds"; "E"]);
         end
 
+        function decodesAccentedNamesFromLatin1Csv(testCase)
+            csvFile = fullfile(fileparts(mfilename('fullpath')), 'fixtures', 'listone_accents.csv');
+            players = src.io.loadListone(string(csvFile));
+            testCase.verifyEqual(players.nome(1), "Laurienté");
+            testCase.verifyEqual(players.nome(2), "Soulé");
+        end
+
         function missingCostoOnOwnedRowThrows(testCase)
             csvFile = fullfile(tempdir, "tLoadListoneTest_missingcost.csv");
             fid = fopen(csvFile, 'w');
