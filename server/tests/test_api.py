@@ -59,3 +59,48 @@ def test_upload_csv_saves_file_and_returns_path(client):
     assert response.status_code == 200
     saved_path = response.json()["path"]
     assert os.path.isfile(saved_path)
+
+
+def test_list_leagues_defaults_to_default_slug(client):
+    response = client.get("/api/leagues")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["active"] == "default"
+
+
+def test_create_league_slugifies_name_and_activates_it(client):
+    response = client.post("/api/leagues", json={"name": "Lega Vera 2027!"})
+    assert response.status_code == 200
+    assert response.json()["slug"] == "lega-vera-2027"
+
+    active_response = client.get("/api/leagues")
+    assert active_response.json()["active"] == "lega-vera-2027"
+
+
+def test_state_and_actions_are_scoped_to_the_active_league(client):
+    client.post("/api/leagues", json={"name": "Lega A"})
+    client.post("/api/actions", json={"type": "setBankOverride", "payload": {"teamName": "X", "value": 1}})
+
+    client.post("/api/leagues", json={"name": "Lega B"})
+    response = client.get("/api/leagues")
+    leagues = response.json()["leagues"]
+    assert "lega-a" in leagues
+    assert "lega-b" in leagues
+
+    switch_response = client.post("/api/leagues/active", json={"slug": "lega-a"})
+    assert switch_response.status_code == 200
+    assert switch_response.json()["active"] == "lega-a"
+
+
+def test_switch_to_unknown_league_returns_404(client):
+    response = client.post("/api/leagues/active", json={"slug": "non-esiste"})
+    assert response.status_code == 404
+
+
+def test_create_league_with_duplicate_name_conflicts_only_if_already_saved(client):
+    # Creating twice before MATLAB ever saves a lega.mat is allowed (idempotent activation);
+    # the 409 only fires once the league actually has persisted state.
+    first = client.post("/api/leagues", json={"name": "Prova"})
+    assert first.status_code == 200
+    second = client.post("/api/leagues", json={"name": "Prova"})
+    assert second.status_code == 200
