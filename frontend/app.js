@@ -605,7 +605,7 @@ function renderFormulaPanel(state) {
 function renderPlayerList(state) {
   const scoresById = new Map(state.scores.map((s) => [s.id, s]));
   const rows = state.players.map((p) => {
-    const s = scoresById.get(p.id) || { fScore: null, qScore: null, score: null };
+    const s = scoresById.get(p.id) || { fScore: null, qScore: null, score: null, roleFactor: null, pesoRuolo: null };
     return {
       id: p.id,
       nome: p.nome,
@@ -618,6 +618,8 @@ function renderPlayerList(state) {
       fScore: s.fScore,
       qScore: s.qScore,
       score: s.score,
+      roleFactor: s.roleFactor,
+      pesoRuolo: s.pesoRuolo,
     };
   });
 
@@ -658,6 +660,8 @@ function renderPlayerList(state) {
           <td class="num mono">${fmt(r.fScore, 3)}</td>
           <td class="num mono">${fmt(r.qScore, 3)}</td>
           <td class="num mono" style="font-weight:700;">${fmt(r.score, 3)}</td>
+          <td class="num mono">${fmt(r.roleFactor, 3)}</td>
+          <td class="num mono" style="font-weight:700; color:var(--gold);">${fmt(r.pesoRuolo, 3)}</td>
         </tr>`
       )
       .join("");
@@ -673,6 +677,8 @@ function renderPlayerList(state) {
     { key: "fScore", label: "F_score", num: true },
     { key: "qScore", label: "Q_score", num: true },
     { key: "score", label: "S", num: true },
+    { key: "roleFactor", label: "RoleFactor", num: true },
+    { key: "pesoRuolo", label: "PesoRuolo", num: true },
   ];
 
   appBody.innerHTML = `
