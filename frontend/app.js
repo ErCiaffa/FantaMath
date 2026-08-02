@@ -350,6 +350,25 @@ async function submitMerge(csvPath, newTeamCredits, statusEl) {
   }
 }
 
+function computeStats(values) {
+  const n = values.length;
+  if (n === 0) return { mean: 0, std: 0, skewness: 0, median: 0 };
+  const mean = values.reduce((s, v) => s + v, 0) / n;
+  const variance = values.reduce((s, v) => s + (v - mean) ** 2, 0) / n;
+  const std = Math.sqrt(variance);
+  const skewness = std > 0 ? values.reduce((s, v) => s + ((v - mean) / std) ** 3, 0) / n : 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const median = n % 2 === 0 ? (sorted[n / 2 - 1] + sorted[n / 2]) / 2 : sorted[(n - 1) / 2];
+  return { mean, std, skewness, median };
+}
+
+function skewnessLabel(skewness) {
+  const abs = Math.abs(skewness);
+  if (abs < 0.5) return "vicina a una normale (poco asimmetrica)";
+  if (abs < 1) return "moderatamente asimmetrica";
+  return "molto asimmetrica" + (skewness > 0 ? " (coda a destra: molti bassi, pochi alti)" : " (coda a sinistra: molti alti, pochi bassi)");
+}
+
 function drawHistogram(canvas, values, opts) {
   const ctx = canvas.getContext("2d");
   const w = canvas.width;
@@ -360,11 +379,13 @@ function drawHistogram(canvas, values, opts) {
   const gridColor = styles.getPropertyValue("--line-soft").trim() || "#333";
   const barColor = opts.color || styles.getPropertyValue("--accent").trim() || "#4c9a6a";
   const textColor = styles.getPropertyValue("--text-faint").trim() || "#888";
+  const hiColor = styles.getPropertyValue("--text-hi").trim() || "#eee";
 
-  const nBins = opts.bins || 20;
+  const nBins = opts.bins || 24;
   const min = opts.min !== undefined ? opts.min : Math.min(...values);
   const max = opts.max !== undefined ? opts.max : Math.max(...values);
   const span = max - min || 1;
+  const binWidth = span / nBins;
   const counts = new Array(nBins).fill(0);
   for (const v of values) {
     let idx = Math.floor(((v - min) / span) * nBins);
@@ -372,32 +393,73 @@ function drawHistogram(canvas, values, opts) {
     if (idx >= nBins) idx = nBins - 1;
     counts[idx]++;
   }
-  const maxCount = Math.max(...counts, 1);
+  const stats = computeStats(values);
 
-  const padBottom = 18;
-  const padTop = 6;
+  const padLeft = 30;
+  const padBottom = 30;
+  const padTop = 10;
+  const padRight = 6;
+  const plotW = w - padLeft - padRight;
   const plotH = h - padBottom - padTop;
-  const barW = w / nBins;
+  const maxCount = Math.max(...counts, 1);
+  const barW = plotW / nBins;
 
+  // axes
   ctx.strokeStyle = gridColor;
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(0, h - padBottom + 0.5);
-  ctx.lineTo(w, h - padBottom + 0.5);
+  ctx.moveTo(padLeft, padTop);
+  ctx.lineTo(padLeft, h - padBottom);
+  ctx.lineTo(w - padRight, h - padBottom);
   ctx.stroke();
 
+  // y ticks: 0 and max
+  ctx.fillStyle = textColor;
+  ctx.font = "9px ui-monospace, monospace";
+  ctx.textAlign = "right";
+  ctx.fillText("0", padLeft - 4, h - padBottom);
+  ctx.fillText(String(maxCount), padLeft - 4, padTop + 8);
+
+  // bars
   ctx.fillStyle = barColor;
   counts.forEach((c, i) => {
     const barH = (c / maxCount) * plotH;
-    ctx.fillRect(i * barW + 1, h - padBottom - barH, Math.max(barW - 2, 1), barH);
+    ctx.fillRect(padLeft + i * barW + 1, h - padBottom - barH, Math.max(barW - 2, 1), barH);
   });
 
+  // normal curve overlay, same count-scale as the bars
+  if (opts.showNormal && stats.std > 0) {
+    ctx.strokeStyle = hiColor;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let px = 0; px <= plotW; px++) {
+      const x = min + (px / plotW) * span;
+      const pdf = Math.exp(-0.5 * ((x - stats.mean) / stats.std) ** 2) / (stats.std * Math.sqrt(2 * Math.PI));
+      const expectedCount = pdf * values.length * binWidth;
+      const y = h - padBottom - (expectedCount / maxCount) * plotH;
+      if (px === 0) ctx.moveTo(padLeft + px, y);
+      else ctx.lineTo(padLeft + px, y);
+    }
+    ctx.stroke();
+  }
+
+  // x ticks
   ctx.fillStyle = textColor;
-  ctx.font = "10px ui-monospace, monospace";
   ctx.textAlign = "left";
-  ctx.fillText(opts.minLabel !== undefined ? opts.minLabel : min.toFixed(2), 2, h - 4);
+  ctx.fillText(min.toFixed(2), padLeft, h - padBottom + 12);
   ctx.textAlign = "right";
-  ctx.fillText(opts.maxLabel !== undefined ? opts.maxLabel : max.toFixed(2), w - 2, h - 4);
+  ctx.fillText(max.toFixed(2), w - padRight, h - padBottom + 12);
+
+  // axis titles
+  ctx.textAlign = "center";
+  ctx.fillText(opts.xLabel || "Punteggio (0-1)", padLeft + plotW / 2, h - 2);
+  ctx.save();
+  ctx.translate(9, padTop + plotH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText(opts.yLabel || "N. giocatori", 0, 0);
+  ctx.restore();
+
+  return stats;
 }
 
 function renderFormulaPanel(state) {
@@ -449,17 +511,27 @@ function renderFormulaPanel(state) {
     </div>
 
     <div class="panel">
-      <div class="panel-head"><h2>Distribuzione punteggi normalizzati (0-1)</h2></div>
+      <div class="panel-head"><h2>Distribuzione punteggi intermedi (0-1)</h2>
+        <span class="hint">Separati, prima del mix con φ</span></div>
       <div class="field-row">
         <div class="field">
-          <label>F_score (FVM)</label>
-          <canvas id="hist-fscore" width="480" height="140" style="width:100%; height:140px;"></canvas>
+          <label>F_score (da FVM)</label>
+          <canvas id="hist-fscore" width="480" height="160" style="width:100%; height:160px;"></canvas>
+          <p class="sub mono" id="stats-fscore"></p>
         </div>
         <div class="field">
-          <label>Q_score (QUOT)</label>
-          <canvas id="hist-qscore" width="480" height="140" style="width:100%; height:140px;"></canvas>
+          <label>Q_score (da QUOT)</label>
+          <canvas id="hist-qscore" width="480" height="160" style="width:100%; height:160px;"></canvas>
+          <p class="sub mono" id="stats-qscore"></p>
         </div>
       </div>
+    </div>
+
+    <div class="panel" style="border-color:var(--gold);">
+      <div class="panel-head"><h2>S — Punteggio finale (0-1)</h2>
+        <span class="hint">F_score e Q_score mescolati con φ — questo diventa il valore svincolo</span></div>
+      <canvas id="hist-score" width="960" height="180" style="width:100%; height:180px;"></canvas>
+      <p class="sub mono" id="stats-score"></p>
     </div>
 
     <div class="footer-bar">
@@ -472,11 +544,22 @@ function renderFormulaPanel(state) {
     <p class="sub" id="formula-status"></p>
   `;
 
+  const fmtStats = (stats) =>
+    `media ${stats.mean.toFixed(3)} · mediana ${stats.median.toFixed(3)} · dev.std ${stats.std.toFixed(3)} · ${skewnessLabel(stats.skewness)} (asimmetria ${stats.skewness.toFixed(2)})`;
+
   const redraw = () => {
+    const styles = getComputedStyle(document.documentElement);
     const fScores = state.scores.map((s) => s.fScore);
     const qScores = state.scores.map((s) => s.qScore);
-    drawHistogram(document.getElementById("hist-fscore"), fScores, { min: 0, max: 1, color: getComputedStyle(document.documentElement).getPropertyValue("--accent") });
-    drawHistogram(document.getElementById("hist-qscore"), qScores, { min: 0, max: 1, color: getComputedStyle(document.documentElement).getPropertyValue("--gold") });
+    const finalScores = state.scores.map((s) => s.score);
+
+    const statsF = drawHistogram(document.getElementById("hist-fscore"), fScores, { min: 0, max: 1, color: styles.getPropertyValue("--accent"), xLabel: "F_score (0-1)", showNormal: true });
+    const statsQ = drawHistogram(document.getElementById("hist-qscore"), qScores, { min: 0, max: 1, color: styles.getPropertyValue("--gold"), xLabel: "Q_score (0-1)", showNormal: true });
+    const statsS = drawHistogram(document.getElementById("hist-score"), finalScores, { min: 0, max: 1, bins: 30, color: styles.getPropertyValue("--gold"), xLabel: "S — punteggio finale (0-1)", showNormal: true });
+
+    document.getElementById("stats-fscore").textContent = fmtStats(statsF);
+    document.getElementById("stats-qscore").textContent = fmtStats(statsQ);
+    document.getElementById("stats-score").textContent = fmtStats(statsS);
   };
   redraw();
 
