@@ -153,5 +153,12 @@ questo limite di stabilità esplicitamente accettato, non ignorato.
 - **2026-08-02**: multi-lega, switch/creazione da frontend.
 - **2026-08-02**: normalizzazione FVM/QUOT — vincolo "2-3 medi=1 top" (non simmetria),
   αF=2/αQ=0.08/φ=0.40, metodo rank-esponenziale scartato dopo verifica.
+- **2026-08-02**: aggiunta schermata "Lista giocatori" (664 righe, ricerca nome, filtro
+  ruolo, colonne ordinabili) prima di procedere a scarsità ruolo — utile per validare
+  visivamente i prossimi step della pipeline (FormulaEngine: normalizza→mix→**scarsità
+  ruolo**→role factor→floor→età→conversione crediti). Deciso di NON convertire ancora S in
+  crediti reali: senza scarsità ruolo la classifica è distorta (es. Dimarco, terzino, sopra
+  ogni centrocampista) — convertirla in crediti ora cristallizzerebbe quella distorsione in
+  un valore economico reale.
 
 *(continua ad ogni nuova decisione)*
