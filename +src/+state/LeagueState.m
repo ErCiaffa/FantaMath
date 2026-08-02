@@ -5,6 +5,8 @@ classdef LeagueState
             state.meta = struct('schemaVersion', 1, 'lastCsvPath', "", 'lastCsvLoadedAt', NaT);
             state.epsilon = NaN;
             state.players = emptyPlayersTable();
+            state.params = defaultFormulaParams();
+            state.scores = emptyScoresTable();
             state.teams = struct();
             state.teams.table = emptyTeamsTable();
             state.teams.transactions = emptyTransactionTable();
@@ -45,6 +47,41 @@ classdef LeagueState
             state.teams.table = table(teamNames, creditiIniziali, nan(n, 1), zeros(n, 1), ...
                 'VariableNames', {'name', 'creditiIniziali', 'bankOverride', 'teamValue'});
             state = src.state.LeagueState.recomputeTeamValue(state);
+            state = src.state.LeagueState.recomputeScores(state);
+        end
+
+        function state = recomputeScores(state)
+            % FORM-01/FORM-02 (ported from FantaMath): F_score/Q_score/S computed over the
+            % WHOLE players table (not just owned rows) -- the percentile cut is relative to
+            % the entire listone pool, matching the source formula's design.
+            n = height(state.players);
+            if n == 0
+                state.scores = emptyScoresTable();
+                return
+            end
+            p = state.params;
+            fScore = src.engine.normalizeScore(state.players.fvm, p.alphaF, p.pLow, p.pHigh);
+            qScore = src.engine.normalizeScore(state.players.quot, p.alphaQ, p.pLow, p.pHigh);
+            score = src.engine.mixScores(fScore, qScore, p.phi);
+            state.scores = table(state.players.id, fScore, qScore, score, ...
+                'VariableNames', {'id', 'fScore', 'qScore', 'score'});
+        end
+
+        function state = setFormulaParams(state, phi, alphaF, alphaQ, pLow, pHigh)
+            arguments
+                state struct
+                phi (1,1) double {mustBeInRange(phi, 0, 1)}
+                alphaF (1,1) double {mustBePositive}
+                alphaQ (1,1) double {mustBePositive}
+                pLow (1,1) double {mustBeInRange(pLow, 0, 1)}
+                pHigh (1,1) double {mustBeInRange(pHigh, 0, 1)}
+            end
+            if pLow >= pHigh
+                error('FantaManager:formula:invalidPercentileRange', ...
+                    'pLow (%.4f) deve essere minore di pHigh (%.4f).', pLow, pHigh);
+            end
+            state.params = struct('phi', phi, 'alphaF', alphaF, 'alphaQ', alphaQ, 'pLow', pLow, 'pHigh', pHigh);
+            state = src.state.LeagueState.recomputeScores(state);
         end
 
         function state = recomputeTeamValue(state)
@@ -156,6 +193,16 @@ function t = emptyPlayersTable()
     t = table('Size', [0 12], ...
         'VariableTypes', {'double','string','string','string','cell','double','double','double','string','double','logical','logical'}, ...
         'VariableNames', {'id','nome','roleClassic','roleMantra','roleTokens','fvm','quot','age','team','costo','owned','fuoriLista'});
+end
+
+function p = defaultFormulaParams()
+    p = struct('phi', 0.5, 'alphaF', 0.0005, 'alphaQ', 0.0005, 'pLow', 0, 'pHigh', 1);
+end
+
+function t = emptyScoresTable()
+    t = table('Size', [0 4], ...
+        'VariableTypes', {'double','double','double','double'}, ...
+        'VariableNames', {'id', 'fScore', 'qScore', 'score'});
 end
 
 function t = emptyTeamsTable()
