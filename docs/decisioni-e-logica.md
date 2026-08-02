@@ -170,7 +170,14 @@ questo limite di stabilità esplicitamente accettato, non ignorato.
   (Braccetto) ora scarso come atteso dalla fix di roleDemand. RoleFactor dipende solo dal
   ruolo (non dalla qualità del giocatore) — per design, la differenziazione per bravura resta
   in S, si combinano nel prossimo step (`assembleWeight`, non ancora costruito).
+- **2026-08-02**: testata anteprima S×PesoRuolo (rho=1) — overcorrezione, Martinez L.
+  (S=0.992, il migliore) sparisce dalla top 20, dominano Dc/M con S mediocre ma RoleFactor
+  alto. **Confermato dal proprietario della lega**: il valore deve venire principalmente
+  dalla forza del giocatore (S), la scarsità di ruolo deve attenuare/aggiustare, non
+  ribaltare la classifica. Prossima sessione: abbassare `rho` (provare 0.3-0.5) quando si
+  costruisce `assembleWeight` vero, non un semplice prodotto S×PesoRuolo.
 - **Prossimo**: età (`ageWeight`), poi floor, poi conversione finale in crediti
-  (`assembleWeight`→`auctionPrice`/`releaseValue`).
+  (`assembleWeight`→`auctionPrice`/`releaseValue`, con `rho` basso per non far dominare il
+  ruolo sulla forza del giocatore).
 
 *(continua ad ogni nuova decisione)*
