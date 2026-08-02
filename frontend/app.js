@@ -625,6 +625,7 @@ function renderPlayerList(state) {
   let sortDir = -1;
   let filterText = "";
   let filterRole = "";
+  let filterOwnedOnly = false;
 
   const roles = Array.from(new Set(rows.flatMap((r) => (r.ruolo || "").split("/")).filter(Boolean))).sort();
 
@@ -632,6 +633,7 @@ function renderPlayerList(state) {
     const filtered = rows.filter((r) => {
       if (filterText && !r.nome.toLowerCase().includes(filterText.toLowerCase())) return false;
       if (filterRole && !(r.ruolo || "").split("/").includes(filterRole)) return false;
+      if (filterOwnedOnly && !r.owned) return false;
       return true;
     });
     filtered.sort((a, b) => {
@@ -691,6 +693,13 @@ function renderPlayerList(state) {
           ${roles.map((r) => `<option value="${r}">${r}</option>`).join("")}
         </select>
       </div>
+      <div class="field" style="max-width:220px; justify-content:flex-end;">
+        <label for="player-owned-filter">&nbsp;</label>
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; padding:10px 0;">
+          <input type="checkbox" id="player-owned-filter" style="width:16px; height:16px;" />
+          Solo posseduti (squadre fanta)
+        </label>
+      </div>
     </div>
     <div class="panel" style="padding:0; overflow:hidden;">
       <div class="table-wrap" style="border:none; border-radius:0; max-height:520px; overflow-y:auto;">
@@ -718,6 +727,10 @@ function renderPlayerList(state) {
   });
   document.getElementById("player-role-filter").addEventListener("change", (e) => {
     filterRole = e.target.value;
+    renderTable();
+  });
+  document.getElementById("player-owned-filter").addEventListener("change", (e) => {
+    filterOwnedOnly = e.target.checked;
     renderTable();
   });
   document.querySelectorAll("[data-sort-key]").forEach((th) => {
