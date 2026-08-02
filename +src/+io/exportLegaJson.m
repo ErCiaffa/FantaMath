@@ -15,7 +15,11 @@ function exportLegaJson(state, jsonPath)
     out.players = table2struct(state.players);
 
     out.teams = struct();
-    out.teams.table = table2struct(state.teams.table);
+    teamsTable = state.teams.table;
+    teamsTable.bonusMalusSum = src.state.LeagueState.bonusMalusSumVector(state);
+    teamsTable.residuo = src.state.LeagueState.bankResiduoVector(state);
+    teamsTable.totale = teamsTable.residuo + teamsTable.teamValue;
+    out.teams.table = table2struct(teamsTable);
 
     txTable = state.teams.transactions;
     txTable.Timestamp = string(txTable.Timestamp);

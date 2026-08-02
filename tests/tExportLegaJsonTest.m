@@ -19,6 +19,10 @@ classdef tExportLegaJsonTest < matlab.unittest.TestCase
             testCase.verifyEqual(string(decoded.teams.table.name), "Squadra A");
             testCase.verifyEqual(numel(decoded.teams.transactions), 1);
             testCase.verifyEqual(string(decoded.teams.transactions.Motivo), "Premio classifica");
+
+            testCase.verifyEqual(decoded.teams.table.bonusMalusSum, 20);
+            testCase.verifyEqual(decoded.teams.table.residuo, 520);
+            testCase.verifyEqual(decoded.teams.table.totale, 520);
         end
 
         function exportsEmptyArraysForEmptyState(testCase)
