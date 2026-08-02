@@ -19,8 +19,19 @@ document.addEventListener("click", (event) => {
 });
 
 async function fetchState() {
-  const response = await fetch("/api/state");
-  return response.json();
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const response = await fetch("/api/state");
+    if (response.ok) {
+      try {
+        return await response.json();
+      } catch (err) {
+        // lega.json caught mid-write (rare race despite atomic rename, e.g. OneDrive sync
+        // touching the file) -- retry briefly instead of surfacing a blank/stuck page.
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
+  throw new Error("Impossibile leggere lo stato della lega dopo piu' tentativi.");
 }
 
 async function postAction(type, payload) {
