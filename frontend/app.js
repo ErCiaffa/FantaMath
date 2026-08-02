@@ -379,7 +379,7 @@ function drawHistogram(canvas, values, opts) {
   const gridColor = styles.getPropertyValue("--line-soft").trim() || "#333";
   const barColor = opts.color || styles.getPropertyValue("--accent").trim() || "#4c9a6a";
   const textColor = styles.getPropertyValue("--text-faint").trim() || "#888";
-  const hiColor = styles.getPropertyValue("--text-hi").trim() || "#eee";
+  const lineColor = styles.getPropertyValue("--chart-line").trim() || "#ffffff90";
 
   const nBins = opts.bins || 24;
   const min = opts.min !== undefined ? opts.min : Math.min(...values);
@@ -429,8 +429,9 @@ function drawHistogram(canvas, values, opts) {
 
   // normal curve overlay, same count-scale as the bars
   if (opts.showNormal && stats.std > 0) {
-    ctx.strokeStyle = hiColor;
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = lineColor;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 4]);
     ctx.beginPath();
     for (let px = 0; px <= plotW; px++) {
       const x = min + (px / plotW) * span;
@@ -441,6 +442,7 @@ function drawHistogram(canvas, values, opts) {
       else ctx.lineTo(padLeft + px, y);
     }
     ctx.stroke();
+    ctx.setLineDash([]);
   }
 
   // x ticks
@@ -554,7 +556,7 @@ function renderFormulaPanel(state) {
     const finalScores = state.scores.map((s) => s.score);
 
     const statsF = drawHistogram(document.getElementById("hist-fscore"), fScores, { min: 0, max: 1, color: styles.getPropertyValue("--accent"), xLabel: "F_score (0-1)", showNormal: true });
-    const statsQ = drawHistogram(document.getElementById("hist-qscore"), qScores, { min: 0, max: 1, color: styles.getPropertyValue("--gold"), xLabel: "Q_score (0-1)", showNormal: true });
+    const statsQ = drawHistogram(document.getElementById("hist-qscore"), qScores, { min: 0, max: 1, color: styles.getPropertyValue("--chart-blue"), xLabel: "Q_score (0-1)", showNormal: true });
     const statsS = drawHistogram(document.getElementById("hist-score"), finalScores, { min: 0, max: 1, bins: 30, color: styles.getPropertyValue("--gold"), xLabel: "S — punteggio finale (0-1)", showNormal: true });
 
     document.getElementById("stats-fscore").textContent = fmtStats(statsF);

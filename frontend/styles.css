@@ -16,6 +16,8 @@
     --gold-soft: #d9a94e22;
     --danger: #e0654f;
     --danger-soft: #e0654f22;
+    --chart-blue: #6f9bd8;
+    --chart-line: #f1f3f770;
     --surface: var(--ink-900);
     --surface-raised: var(--ink-850);
     --surface-sunken: var(--ink-950);
@@ -41,6 +43,8 @@
     --gold-soft: #a97a1f18;
     --danger: #c14732;
     --danger-soft: #c1473218;
+    --chart-blue: #3f6bab;
+    --chart-line: #1a1e2790;
     --surface: var(--ink-900);
     --surface-raised: var(--ink-850);
     --surface-sunken: var(--ink-950);
@@ -67,6 +71,8 @@
       --gold-soft: #a97a1f18;
       --danger: #c14732;
       --danger-soft: #c1473218;
+      --chart-blue: #3f6bab;
+      --chart-line: #1a1e2790;
       --shadow: 0 20px 50px -24px rgba(30, 40, 60, 0.35);
     }
   }
