@@ -12,6 +12,12 @@ while true
     statePath = string(fullfile(leagueDir, 'lega.mat'));
     jsonPath = string(fullfile(leagueDir, 'lega.json'));
 
-    src.app.processQueue(queuePath, statePath, jsonPath);
+    try
+        src.app.processQueue(queuePath, statePath, jsonPath);
+    catch ME
+        % Never let one broken league (e.g. stale schema) kill the poller for every other
+        % league forever -- log and keep going, matches the "never a silent stall" intent.
+        fprintf('FantaManager: errore lega "%s": %s\n', slug, ME.message);
+    end
     pause(2);
 end

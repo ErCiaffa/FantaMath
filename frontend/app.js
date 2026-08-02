@@ -1,5 +1,23 @@
 const appBody = document.getElementById("app-body");
 
+document.addEventListener("click", (event) => {
+  const existing = document.querySelector(".tip-popup");
+  const icon = event.target.closest(".tip-icon");
+  if (existing) existing.remove();
+  if (icon && icon !== existing?.dataset?.forIcon) {
+    const rect = icon.getBoundingClientRect();
+    const popup = document.createElement("div");
+    popup.className = "tip-popup";
+    popup.textContent = icon.dataset.tip;
+    document.body.appendChild(popup);
+    const top = Math.min(rect.bottom + 6, window.innerHeight - popup.offsetHeight - 10);
+    const left = Math.min(rect.left, window.innerWidth - popup.offsetWidth - 10);
+    popup.style.top = `${Math.max(top, 10)}px`;
+    popup.style.left = `${Math.max(left, 10)}px`;
+    event.stopPropagation();
+  }
+});
+
 async function fetchState() {
   const response = await fetch("/api/state");
   return response.json();
@@ -483,7 +501,7 @@ function renderFormulaPanel(state) {
     <div class="panel">
       <div class="panel-head"><h2>Peso FVM / QUOT</h2></div>
       <div class="field">
-        <label for="phi-slider">φ (peso QUOT %) <span class="edit-icon" title="Quanto pesano FVM e QUOT nel punteggio finale. Alza per dare piu' peso al QUOT (prezzo di mercato reale), abbassa per dare piu' peso al FVM (proiezione fantavoto). phi=1 -> solo FVM, phi=0 -> solo QUOT.">?</span></label>
+        <label for="phi-slider">φ (peso QUOT %) <span class="edit-icon tip-icon" data-tip="Quanto pesano FVM e QUOT nel punteggio finale. Alza per dare piu' peso al QUOT (prezzo di mercato reale), abbassa per dare piu' peso al FVM (proiezione fantavoto). phi=1 -> solo FVM, phi=0 -> solo QUOT.">?</span></label>
         <input type="range" id="phi-slider" min="0" max="100" value="${quotWeight}" style="width:100%;" />
         <span class="sub mono" id="phi-value">QUOT ${quotWeight}% / FVM ${100 - quotWeight}%</span>
       </div>
@@ -493,11 +511,11 @@ function renderFormulaPanel(state) {
       <div class="panel-head"><h2>Compressione logaritmica</h2></div>
       <div class="field-row">
         <div class="field">
-          <label for="alphaF-input">α<sub>F</sub> (FVM) <span class="edit-icon" title="Comprime i valori FVM molto alti prima di normalizzare. Alza per appiattire di piu' le differenze tra i top player, abbassa (verso 0.0001) per comprimere pochissimo.">?</span></label>
+          <label for="alphaF-input">α<sub>F</sub> (FVM) <span class="edit-icon tip-icon" data-tip="Comprime i valori FVM molto alti prima di normalizzare. Alza per appiattire di piu' le differenze tra i top player, abbassa (verso 0.0001) per comprimere pochissimo.">?</span></label>
           <input class="input mono" id="alphaF-input" value="${p.alphaF}" />
         </div>
         <div class="field">
-          <label for="alphaQ-input">α<sub>Q</sub> (QUOT) <span class="edit-icon" title="Comprime i valori QUOT molto alti prima di normalizzare. Stesso principio di alpha_F ma sul prezzo di mercato.">?</span></label>
+          <label for="alphaQ-input">α<sub>Q</sub> (QUOT) <span class="edit-icon tip-icon" data-tip="Comprime i valori QUOT molto alti prima di normalizzare. Stesso principio di alpha_F ma sul prezzo di mercato.">?</span></label>
           <input class="input mono" id="alphaQ-input" value="${p.alphaQ}" />
         </div>
       </div>
@@ -507,11 +525,11 @@ function renderFormulaPanel(state) {
       <div class="panel-head"><h2>Taglio percentile</h2></div>
       <div class="field-row">
         <div class="field">
-          <label for="pLow-input">p<sub>low</sub> <span class="edit-icon" title="Percentile basso da tagliare prima di normalizzare (0-1). Alza per ignorare i valori piu' bassi. Default 0 = nessun taglio.">?</span></label>
+          <label for="pLow-input">p<sub>low</sub> <span class="edit-icon tip-icon" data-tip="Percentile basso da tagliare prima di normalizzare (0-1). Alza per ignorare i valori piu' bassi. Default 0 = nessun taglio.">?</span></label>
           <input class="input mono" id="pLow-input" value="${p.pLow}" />
         </div>
         <div class="field">
-          <label for="pHigh-input">p<sub>high</sub> <span class="edit-icon" title="Percentile alto da tagliare prima di normalizzare (0-1). Abbassa per ignorare i valori piu' alti. Default 1 = nessun taglio.">?</span></label>
+          <label for="pHigh-input">p<sub>high</sub> <span class="edit-icon tip-icon" data-tip="Percentile alto da tagliare prima di normalizzare (0-1). Abbassa per ignorare i valori piu' alti. Default 1 = nessun taglio.">?</span></label>
           <input class="input mono" id="pHigh-input" value="${p.pHigh}" />
         </div>
       </div>

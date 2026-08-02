@@ -410,3 +410,17 @@
 .modal-box h2 { margin: 0 0 16px; font-size: 15px; font-weight: 700; }
 .modal-box .field { margin-bottom: 12px; }
 .modal-error { color: var(--danger); }
+
+.tip-popup {
+  position: fixed;
+  max-width: 280px;
+  background: var(--surface-raised);
+  border: 1px solid var(--gold);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-hi);
+  box-shadow: var(--shadow);
+  z-index: 200;
+}
