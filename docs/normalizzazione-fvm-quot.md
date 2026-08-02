@@ -112,6 +112,88 @@ quindi pesato di più il segnale stabile.
 gemello FantaMath per lo stesso motivo. Non è una scelta statistica ma di lega — registrata
 qui perché guida come i due segnali si bilanciano nel punteggio finale S.
 
+## 6b. Instabilità agli estremi — trovata, indagata, in parte irrisolta
+
+Osservazione del proprietario della lega: la forma "vicina a normale" di F_score (asimmetria
+0.17 con αF=2) nasconde un problema. `normalizeScore` ancora **sempre** il minimo a 0.000 e
+il massimo a 1.000 esatti — solo la forma in mezzo cambia con `alpha`. Con i dati reali:
+
+```
+FVM=1: 8 giocatori (probabili riserve senza dati reali) -> fanno da pavimento per tutti i 313
+FVM=350: 1 solo giocatore (Malen) -> fa da soffitto per tutti i 313
+```
+
+Test di stabilità: rimuovendo il singolo giocatore top dal pool e ricalcolando, quanto si
+spostano gli altri 312 punteggi?
+
+```
+min-max (metodo attuale): shift medio 0.008, shift massimo 0.016 (1.6%)
+```
+
+Non enorme, ma reale: aggiungere o perdere un solo giocatore-fenomeno (o una riserva a
+FVM=1) sposta *tutti* gli altri punteggi della lega, anche chi non c'entra nulla con quel
+giocatore.
+
+**Percentile-cut mirato (testato, scartato)**: tagliare solo il fondo (`pLow=0.03`) per
+escludere le 8 riserve FVM=1 dall'ancora minima. Risultato: **peggiora** il vincolo
+principale (rapporto top/mediano sale da 2.34 a 4.01) — spostare l'ancora comprime la fascia
+mediana più del previsto. Scartato.
+
+**Normalizzazione robusta (mediana/MAD, testata)**: invece di ancorare a min/max letterali,
+ancorare a mediana e MAD (deviazione assoluta mediana, statistica robusta agli outlier).
+Stabilità: shift medio **0.000**, shift massimo **0.000** rimuovendo il top player — risolve
+il problema di stabilità. Ma con clipping ingenuo a [0,1] ricrea lo stesso bug del taglio
+percentile: **14-85 giocatori diversi finiscono schiacciati allo stesso punteggio 1.000**
+(a seconda di quanto largo il range scelto). Serve un mapping più curato per usarla davvero,
+non fatto in questa sessione.
+
+**Conclusione**: l'instabilità agli estremi resta un limite noto e non risolto del metodo
+min-max attuale. Non si sistema da sola con lavoro futuro su altri assi (es. scarsità ruolo,
+che è un problema indipendente). Un fix vero richiede un metodo di normalizzazione diverso,
+progettato con cura per evitare sia l'instabilità sia lo schiacciamento — lavoro dedicato,
+non fatto oggi.
+
+## 6c. Tentativo di risolvere ENTRAMBI i vincoli insieme (scalini 2-3x consistenti + stabilità)
+
+Richiesta successiva del proprietario della lega: non solo top/mediano a 2-3x, ma **ogni
+scalino** (scarso→basso→medio→top) coerente a 2-3x, sistema scalabile, equilibrato — non
+concentrare credito su pochi giocatori.
+
+**Metodo progettato**: invece di normalizzare il valore grezzo (FVM/QUOT), si usa il
+**rank percentile** di ogni giocatore nel pool (posizione relativa, non valore assoluto), poi
+si applica una curva esponenziale calibrata: `score = exp(b * (rank - 0.5))`, con `b`
+scelto in modo che ogni scalino di 0.25 di rank percentile (un quarto del pool) valga
+esattamente il rapporto voluto (qui calibrato a 2.5x, centro della banda 2-3).
+
+Perché una curva esponenziale sul rank: è l'unica forma matematica che garantisce lo STESSO
+rapporto ad ogni scalino per costruzione, non per aggiustamento manuale scalino per scalino.
+
+**Risultato sui dati reali (quartili scarso/basso/medio/top)**:
+
+```
+scarso -> basso: 2.62x
+basso  -> medio: 2.37x
+medio  -> top:   2.53x
+scarso -> top (salto totale): 15.7x
+```
+
+Tutti e tre gli scalini dentro banda 2-3x, per costruzione — obiettivo raggiunto.
+
+**Ma la stabilità agli estremi PEGGIORA con questo metodo**, non migliora: rimuovendo il
+singolo top player, shift medio **0.0147** (quasi 2x peggio del metodo attuale) e shift
+massimo **0.073** (4.5x peggio). Motivo: il rank percentile di ogni giocatore dipende dalla
+dimensione del pool (`n`) — quando un giocatore esce, il denominatore `n-1` cambia per
+tutti, e la curva esponenziale amplifica questo spostamento vicino al top, dove la curva è
+più ripida.
+
+**Conclusione onesta**: nessuno dei due metodi testati oggi risolve *entrambi* i problemi
+insieme. Il metodo min-max+alpha (attuale, con αF=2/αQ=0.08) è ragionevolmente stabile ma
+richiede tarare ogni scalino a mano. Il metodo rank-esponenziale garantisce scalini 2-3x
+consistenti per costruzione ma è meno stabile agli estremi. Una vera soluzione a entrambi
+richiederebbe ancorare i percentili a un riferimento fisso esterno al pool corrente (es. una
+distribuzione storica multi-stagione), non al listone della singola settimana — lavoro
+architetturale più grande, da pianificare a parte, non fatto oggi.
+
 ## 7. Raccomandazione finale
 
 | Parametro | Valore precedente | Valore raccomandato | Perché |
