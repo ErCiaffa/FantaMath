@@ -186,6 +186,7 @@ function renderDashboard(state) {
         <h1 style="font-size:22px;">Dashboard</h1>
       </div>
       <div class="right">
+        <button class="btn btn-ghost btn-sm" id="players-btn">☰ Lista giocatori</button>
         <button class="btn btn-ghost btn-sm" id="formula-btn">φ Formula valori</button>
         <button class="btn btn-ghost btn-sm" id="update-csv-btn">↻ Carica nuovo CSV (aggiorna)</button>
       </div>
@@ -273,6 +274,10 @@ function renderDashboard(state) {
 
   document.getElementById("formula-btn").addEventListener("click", () => {
     renderFormulaPanel(state);
+  });
+
+  document.getElementById("players-btn").addEventListener("click", () => {
+    renderPlayerList(state);
   });
 }
 
@@ -595,6 +600,138 @@ function renderFormulaPanel(state) {
       statusEl.textContent = `Errore: ${err.message}`;
     }
   });
+}
+
+function renderPlayerList(state) {
+  const scoresById = new Map(state.scores.map((s) => [s.id, s]));
+  const rows = state.players.map((p) => {
+    const s = scoresById.get(p.id) || { fScore: null, qScore: null, score: null };
+    return {
+      id: p.id,
+      nome: p.nome,
+      ruolo: p.roleMantra,
+      squadra: p.team || "—",
+      owned: p.owned,
+      fuoriLista: p.fuoriLista,
+      fvm: p.fvm,
+      quot: p.quot,
+      fScore: s.fScore,
+      qScore: s.qScore,
+      score: s.score,
+    };
+  });
+
+  let sortKey = "score";
+  let sortDir = -1;
+  let filterText = "";
+  let filterRole = "";
+
+  const roles = Array.from(new Set(rows.flatMap((r) => (r.ruolo || "").split("/")).filter(Boolean))).sort();
+
+  function renderTable() {
+    const filtered = rows.filter((r) => {
+      if (filterText && !r.nome.toLowerCase().includes(filterText.toLowerCase())) return false;
+      if (filterRole && !(r.ruolo || "").split("/").includes(filterRole)) return false;
+      return true;
+    });
+    filtered.sort((a, b) => {
+      const av = a[sortKey];
+      const bv = b[sortKey];
+      if (av === null || av === undefined) return 1;
+      if (bv === null || bv === undefined) return -1;
+      if (typeof av === "string") return sortDir * av.localeCompare(bv);
+      return sortDir * (av - bv);
+    });
+
+    const fmt = (v, digits) => (v === null || v === undefined ? "—" : Number(v).toFixed(digits));
+
+    document.getElementById("player-table-body").innerHTML = filtered
+      .map(
+        (r) => `<tr>
+          <td class="team-name">${r.nome}${r.fuoriLista ? ' <span class="pill pill-out">fuori lista</span>' : ""}</td>
+          <td>${r.ruolo}</td>
+          <td>${r.squadra}</td>
+          <td class="num mono">${r.fvm}</td>
+          <td class="num mono">${r.quot}</td>
+          <td class="num mono">${fmt(r.fScore, 3)}</td>
+          <td class="num mono">${fmt(r.qScore, 3)}</td>
+          <td class="num mono" style="font-weight:700;">${fmt(r.score, 3)}</td>
+        </tr>`
+      )
+      .join("");
+    document.getElementById("player-count").textContent = `${filtered.length} / ${rows.length} giocatori`;
+  }
+
+  const columns = [
+    { key: "nome", label: "Nome" },
+    { key: "ruolo", label: "Ruolo" },
+    { key: "squadra", label: "Squadra" },
+    { key: "fvm", label: "FVM", num: true },
+    { key: "quot", label: "QUOT", num: true },
+    { key: "fScore", label: "F_score", num: true },
+    { key: "qScore", label: "Q_score", num: true },
+    { key: "score", label: "S", num: true },
+  ];
+
+  appBody.innerHTML = `
+    <div>
+      <div class="eyebrow">Valori Svincolo</div>
+      <h1>Lista giocatori</h1>
+      <p class="sub" id="player-count"></p>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="player-search">Cerca nome</label>
+        <input class="input" id="player-search" placeholder="es. Martinez" />
+      </div>
+      <div class="field" style="max-width:220px;">
+        <label for="player-role-filter">Ruolo</label>
+        <select class="input" id="player-role-filter">
+          <option value="">Tutti</option>
+          ${roles.map((r) => `<option value="${r}">${r}</option>`).join("")}
+        </select>
+      </div>
+    </div>
+    <div class="panel" style="padding:0; overflow:hidden;">
+      <div class="table-wrap" style="border:none; border-radius:0; max-height:520px; overflow-y:auto;">
+        <table>
+          <thead><tr>
+            ${columns
+              .map((c) => `<th ${c.num ? 'class="num"' : ""} data-sort-key="${c.key}" style="cursor:pointer;">${c.label}</th>`)
+              .join("")}
+          </tr></thead>
+          <tbody id="player-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="footer-bar">
+      <div></div>
+      <div class="footer-actions"><button class="btn btn-ghost" id="players-back-btn">← Torna alla dashboard</button></div>
+    </div>
+  `;
+
+  renderTable();
+
+  document.getElementById("player-search").addEventListener("input", (e) => {
+    filterText = e.target.value;
+    renderTable();
+  });
+  document.getElementById("player-role-filter").addEventListener("change", (e) => {
+    filterRole = e.target.value;
+    renderTable();
+  });
+  document.querySelectorAll("[data-sort-key]").forEach((th) => {
+    th.addEventListener("click", () => {
+      const key = th.dataset.sortKey;
+      if (sortKey === key) sortDir *= -1;
+      else {
+        sortKey = key;
+        sortDir = -1;
+      }
+      renderTable();
+    });
+  });
+  document.getElementById("players-back-btn").addEventListener("click", () => loadAndRender());
 }
 
 async function renderLeagueBar() {
