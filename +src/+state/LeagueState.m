@@ -63,8 +63,15 @@ classdef LeagueState
             fScore = src.engine.normalizeScore(state.players.fvm, p.alphaF, p.pLow, p.pHigh);
             qScore = src.engine.normalizeScore(state.players.quot, p.alphaQ, p.pLow, p.pHigh);
             score = src.engine.mixScores(fScore, qScore, p.phi);
-            state.scores = table(state.players.id, fScore, qScore, score, ...
-                'VariableNames', {'id', 'fScore', 'qScore', 'score'});
+
+            roleParams = struct('qw', p.qw, 'mix_owned', p.mixOwned, 'eta', p.eta, ...
+                'Sq', max(height(state.teams.table), 1), 'nmax', p.nmax, 'beta', p.beta, ...
+                'rho', p.rho, 'roleOverride', p.roleOverride);
+            scarcity = src.engine.roleScarcity(state.players, score, roleParams);
+            rf = src.engine.roleFactor(state.players.roleTokens, scarcity, roleParams);
+
+            state.scores = table(state.players.id, fScore, qScore, score, rf.RoleFactor, rf.Flex, rf.PesoRuolo, ...
+                'VariableNames', {'id', 'fScore', 'qScore', 'score', 'roleFactor', 'flex', 'pesoRuolo'});
         end
 
         function state = setFormulaParams(state, phi, alphaF, alphaQ, pLow, pHigh)
@@ -80,7 +87,30 @@ classdef LeagueState
                 error('FantaManager:formula:invalidPercentileRange', ...
                     'pLow (%.4f) deve essere minore di pHigh (%.4f).', pLow, pHigh);
             end
-            state.params = struct('phi', phi, 'alphaF', alphaF, 'alphaQ', alphaQ, 'pLow', pLow, 'pHigh', pHigh);
+            state.params.phi = phi;
+            state.params.alphaF = alphaF;
+            state.params.alphaQ = alphaQ;
+            state.params.pLow = pLow;
+            state.params.pHigh = pHigh;
+            state = src.state.LeagueState.recomputeScores(state);
+        end
+
+        function state = setRoleParams(state, qw, mixOwned, eta, nmax, beta, rho)
+            arguments
+                state struct
+                qw (1,1) double {mustBeNonnegative}
+                mixOwned (1,1) double {mustBeInRange(mixOwned, 0, 1)}
+                eta (1,1) double {mustBePositive}
+                nmax (1,1) double {mustBePositive, mustBeInteger}
+                beta (1,1) double {mustBeNonnegative}
+                rho (1,1) double {mustBePositive}
+            end
+            state.params.qw = qw;
+            state.params.mixOwned = mixOwned;
+            state.params.eta = eta;
+            state.params.nmax = nmax;
+            state.params.beta = beta;
+            state.params.rho = rho;
             state = src.state.LeagueState.recomputeScores(state);
         end
 
@@ -196,13 +226,14 @@ function t = emptyPlayersTable()
 end
 
 function p = defaultFormulaParams()
-    p = struct('phi', 0.5, 'alphaF', 0.0005, 'alphaQ', 0.0005, 'pLow', 0, 'pHigh', 1);
+    p = struct('phi', 0.5, 'alphaF', 0.0005, 'alphaQ', 0.0005, 'pLow', 0, 'pHigh', 1, ...
+        'qw', 1, 'mixOwned', 1, 'eta', 1, 'nmax', 3, 'beta', 0.2, 'rho', 1, 'roleOverride', struct());
 end
 
 function t = emptyScoresTable()
-    t = table('Size', [0 4], ...
-        'VariableTypes', {'double','double','double','double'}, ...
-        'VariableNames', {'id', 'fScore', 'qScore', 'score'});
+    t = table('Size', [0 7], ...
+        'VariableTypes', {'double','double','double','double','double','double','double'}, ...
+        'VariableNames', {'id', 'fScore', 'qScore', 'score', 'roleFactor', 'flex', 'pesoRuolo'});
 end
 
 function t = emptyTeamsTable()
