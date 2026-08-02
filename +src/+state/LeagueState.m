@@ -11,6 +11,67 @@ classdef LeagueState
             state.teams.released = zeros(0, 1);
         end
 
+        function state = createFromCsv(csvFile, creditiMap, epsilonValue)
+            arguments
+                csvFile (1,1) string {mustBeNonzeroLengthText}
+                creditiMap containers.Map
+                epsilonValue (1,1) double {mustBeFinite}
+            end
+            players = src.io.loadListone(csvFile);
+            teamNames = unique(players.team(players.owned & strlength(players.team) > 0));
+            n = numel(teamNames);
+
+            missing = strings(0, 1);
+            for i = 1:n
+                if ~isKey(creditiMap, char(teamNames(i)))
+                    missing(end+1, 1) = teamNames(i); %#ok<AGROW>
+                end
+            end
+            if ~isempty(missing)
+                error('FantaManager:setup:missingCredits', ...
+                    'Crediti iniziali mancanti per le squadre: %s.', strjoin(missing, ', '));
+            end
+
+            creditiIniziali = zeros(n, 1);
+            for i = 1:n
+                creditiIniziali(i) = creditiMap(char(teamNames(i)));
+            end
+
+            state = src.state.LeagueState.empty();
+            state.players = players;
+            state.epsilon = epsilonValue;
+            state.meta.lastCsvPath = csvFile;
+            state.meta.lastCsvLoadedAt = datetime('now');
+            state.teams.table = table(teamNames, creditiIniziali, nan(n, 1), zeros(n, 1), ...
+                'VariableNames', {'name', 'creditiIniziali', 'bankOverride', 'teamValue'});
+            state = src.state.LeagueState.recomputeTeamValue(state);
+        end
+
+        function state = recomputeTeamValue(state)
+            n = height(state.teams.table);
+            teamValue = zeros(n, 1);
+            for i = 1:n
+                mask = state.players.owned & state.players.team == state.teams.table.name(i);
+                teamValue(i) = sum(state.players.costo(mask));
+            end
+            state.teams.table.teamValue = teamValue;
+        end
+
+        function state = addTeam(state, teamName, creditiIniziali)
+            arguments
+                state struct
+                teamName (1,1) string
+                creditiIniziali (1,1) double {mustBeFinite}
+            end
+            if any(state.teams.table.name == teamName)
+                error('FantaManager:state:teamAlreadyExists', ...
+                    'La squadra "%s" esiste gia'' nello stato corrente.', teamName);
+            end
+            newRow = table(teamName, creditiIniziali, NaN, 0, ...
+                'VariableNames', {'name', 'creditiIniziali', 'bankOverride', 'teamValue'});
+            state.teams.table = [state.teams.table; newRow];
+        end
+
         function saveState(state, matPath)
             arguments
                 state struct
