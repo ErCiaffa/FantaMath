@@ -139,6 +139,14 @@ classdef LeagueState
             state.teams.table = [state.teams.table; newRow];
         end
 
+        function state = setEpsilon(state, epsilonValue)
+            arguments
+                state struct
+                epsilonValue (1,1) double {mustBeFinite}
+            end
+            state.epsilon = epsilonValue;
+        end
+
         function state = setBankOverride(state, teamName, value)
             arguments
                 state struct

@@ -102,6 +102,9 @@ function state = applyEntry(state, entry)
             state.meta.lastCsvPath = string(entry.payload.csvPath);
             state.meta.lastCsvLoadedAt = datetime('now');
 
+        case "setEpsilon"
+            state = src.state.LeagueState.setEpsilon(state, entry.payload.epsilon);
+
         case "setBankOverride"
             state = src.state.LeagueState.setBankOverride(state, string(entry.payload.teamName), entry.payload.value);
 

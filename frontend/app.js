@@ -488,6 +488,7 @@ function drawHistogram(canvas, values, opts) {
 }
 
 function renderFormulaPanel(state) {
+  renderNavbar("formula", true);
   const p = state.params;
   const quotWeight = Math.round((1 - p.phi) * 100);
 
@@ -621,6 +622,7 @@ function renderFormulaPanel(state) {
 }
 
 function renderPlayerList(state) {
+  renderNavbar("players", true);
   const scoresById = new Map(state.scores.map((s) => [s.id, s]));
   const rows = state.players.map((p) => {
     const s = scoresById.get(p.id) || { fScore: null, qScore: null, score: null, roleFactor: null, pesoRuolo: null };
@@ -813,12 +815,37 @@ async function renderLeagueBar() {
   });
 }
 
+function renderNavbar(active, hasLeague) {
+  const items = [
+    { key: "dashboard", label: "Dashboard", fn: () => loadAndRender() },
+    { key: "players", label: "☰ Lista giocatori", fn: () => fetchState().then(renderPlayerList) },
+    { key: "formula", label: "φ Formula valori", fn: () => fetchState().then(renderFormulaPanel) },
+  ];
+  const nav = document.getElementById("navbar");
+  if (!hasLeague) {
+    nav.innerHTML = "";
+    return;
+  }
+  nav.innerHTML = items
+    .map(
+      (it) => `<button class="btn btn-ghost btn-sm nav-item" data-nav="${it.key}" style="${
+        active === it.key ? "background:var(--ink-750); color:var(--text-hi);" : ""
+      }">${it.label}</button>`
+    )
+    .join("");
+  items.forEach((it) => {
+    nav.querySelector(`[data-nav="${it.key}"]`).addEventListener("click", it.fn);
+  });
+}
+
 async function loadAndRender() {
   await renderLeagueBar();
   const state = await fetchState();
   if (!state.teams || state.teams.table.length === 0) {
+    renderNavbar("dashboard", false);
     renderUploadScreen();
   } else {
+    renderNavbar("dashboard", true);
     renderDashboard(state);
   }
 }
