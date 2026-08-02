@@ -345,7 +345,50 @@ async function submitMerge(csvPath, newTeamCredits, statusEl) {
   }
 }
 
+async function renderLeagueBar() {
+  const response = await fetch("/api/leagues");
+  const { leagues, active } = await response.json();
+  const bar = document.getElementById("league-bar");
+
+  bar.innerHTML = `
+    <select class="input mono" id="league-select" style="padding:6px 10px; font-size:12px;">
+      ${leagues.map((slug) => `<option value="${slug}" ${slug === active ? "selected" : ""}>${slug}</option>`).join("")}
+    </select>
+    <button class="btn btn-ghost btn-sm" id="new-league-btn">+ Nuova lega</button>
+  `;
+
+  document.getElementById("league-select").addEventListener("change", async (event) => {
+    await fetch("/api/leagues/active", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slug: event.target.value }),
+    });
+    await loadAndRender();
+  });
+
+  document.getElementById("new-league-btn").addEventListener("click", () => {
+    openModal({
+      title: "Nuova lega",
+      fields: [{ key: "name", label: "Nome lega", value: "" }],
+      onSubmit: async ({ name }) => {
+        if (!name || name.trim().length === 0) throw new Error("Il nome e' obbligatorio.");
+        const createResponse = await fetch("/api/leagues", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name }),
+        });
+        if (!createResponse.ok) {
+          const body = await createResponse.json();
+          throw new Error(body.detail || "Impossibile creare la lega.");
+        }
+        await loadAndRender();
+      },
+    });
+  });
+}
+
 async function loadAndRender() {
+  await renderLeagueBar();
   const state = await fetchState();
   if (!state.teams || state.teams.table.length === 0) {
     renderUploadScreen();
