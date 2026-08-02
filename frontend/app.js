@@ -174,8 +174,10 @@ function renderUploadScreen() {
 
 function renderDashboard(state) {
   const teams = state.teams.table;
-  const totalCredits = teams.reduce((sum, t) => sum + t.creditiIniziali, 0);
-  const totalBank = teams.reduce((sum, t) => sum + (isOverrideSet(t.bankOverride) ? t.bankOverride : t.creditiIniziali), 0);
+  const totalBanca = teams.reduce((sum, t) => sum + (isOverrideSet(t.bankOverride) ? t.bankOverride : t.creditiIniziali), 0);
+  const totalBonusMalus = teams.reduce((sum, t) => sum + t.bonusMalusSum, 0);
+  const totalResiduo = teams.reduce((sum, t) => sum + t.residuo, 0);
+  const totalGenerale = teams.reduce((sum, t) => sum + t.totale, 0);
 
   appBody.innerHTML = `
     <div class="toolbar">
@@ -190,22 +192,41 @@ function renderDashboard(state) {
     <div class="stat-grid">
       <div class="stat"><span class="k">Squadre</span><span class="v">${teams.length}</span></div>
       <div class="stat"><span class="k">Epsilon</span><span class="v gold">${state.epsilon}</span></div>
-      <div class="stat"><span class="k">Crediti in circolazione</span><span class="v">${totalCredits}</span></div>
-      <div class="stat"><span class="k">Banche residue totali</span><span class="v accent">${totalBank}</span></div>
+      <div class="stat"><span class="k">Banca totale</span><span class="v">${totalBanca}</span></div>
+      <div class="stat"><span class="k">Bonus/Malus totale</span><span class="v ${totalBonusMalus >= 0 ? "accent" : "gold"}">${totalBonusMalus}</span></div>
+      <div class="stat"><span class="k">Residuo totale</span><span class="v accent">${totalResiduo}</span></div>
+      <div class="stat"><span class="k">Totale generale</span><span class="v gold">${totalGenerale}</span></div>
     </div>
     <div class="panel" style="padding:0; overflow:hidden;">
       <div class="table-wrap" style="border:none; border-radius:0;"><table>
-        <thead><tr><th>Squadra</th><th class="num">Crediti iniziali</th><th class="num">Valore squadra</th><th class="num">Banca residua</th><th></th></tr></thead>
+        <thead><tr>
+          <th>Squadra</th>
+          <th class="num">Banca</th>
+          <th class="num">Bonus/Malus</th>
+          <th class="num">Valore squadra</th>
+          <th class="num">Residuo</th>
+          <th class="num">Totale</th>
+        </tr></thead>
         <tbody>${teams
           .map((t) => {
-            const bank = isOverrideSet(t.bankOverride) ? t.bankOverride : t.creditiIniziali;
+            const banca = isOverrideSet(t.bankOverride) ? t.bankOverride : t.creditiIniziali;
             return `<tr>
               <td class="team-name">${t.name}</td>
-              <td class="num mono">${t.creditiIniziali}</td>
+              <td class="num">
+                <div class="bank-cell" style="justify-content:flex-end;">
+                  <span class="bank-value ${banca >= 0 ? "pos" : "neg"}">${banca}</span>
+                  <span class="edit-icon" data-edit-banca-for="${t.name}">✎</span>
+                </div>
+              </td>
+              <td class="num">
+                <div class="bank-cell" style="justify-content:flex-end;">
+                  <span class="bank-value ${t.bonusMalusSum >= 0 ? "pos" : "neg"}">${t.bonusMalusSum}</span>
+                  <span class="edit-icon" data-edit-bm-for="${t.name}">✎</span>
+                </div>
+              </td>
               <td class="num mono">${t.teamValue}</td>
-              <td class="num"><span class="bank-value ${bank >= 0 ? "pos" : "neg"}" data-bank-for="${t.name}">${bank}</span>
-                <span class="edit-icon" data-edit-for="${t.name}">✎</span></td>
-              <td class="num"><button class="bm-btn" data-bonus-for="${t.name}">± B/M</button></td>
+              <td class="num mono">${t.residuo}</td>
+              <td class="num mono" style="font-weight:700;">${t.totale}</td>
             </tr>`;
           })
           .join("")}</tbody>
@@ -214,11 +235,11 @@ function renderDashboard(state) {
   `;
 
   teams.forEach((t) => {
-    document.querySelector(`[data-edit-for="${CSS.escape(t.name)}"]`).addEventListener("click", () => {
-      const currentBank = isOverrideSet(t.bankOverride) ? t.bankOverride : t.creditiIniziali;
+    document.querySelector(`[data-edit-banca-for="${CSS.escape(t.name)}"]`).addEventListener("click", () => {
+      const currentBanca = isOverrideSet(t.bankOverride) ? t.bankOverride : t.creditiIniziali;
       openModal({
-        title: `Nuova banca residua — ${t.name}`,
-        fields: [{ key: "value", label: "Banca residua", value: currentBank }],
+        title: `Modifica banca — ${t.name}`,
+        fields: [{ key: "value", label: "Banca", value: currentBanca }],
         onSubmit: async ({ value }) => {
           const numeric = parseFloat(value);
           if (Number.isNaN(numeric)) throw new Error("Inserisci un numero valido.");
@@ -227,9 +248,9 @@ function renderDashboard(state) {
         },
       });
     });
-    document.querySelector(`[data-bonus-for="${CSS.escape(t.name)}"]`).addEventListener("click", () => {
+    document.querySelector(`[data-edit-bm-for="${CSS.escape(t.name)}"]`).addEventListener("click", () => {
       openModal({
-        title: `Bonus / Malus — ${t.name}`,
+        title: `Aggiungi Bonus/Malus — ${t.name}`,
         fields: [
           { key: "amount", label: "Importo (positivo=bonus, negativo=malus)", value: "" },
           { key: "motivo", label: "Motivo (obbligatorio)", value: "" },
