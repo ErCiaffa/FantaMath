@@ -186,6 +186,7 @@ function renderDashboard(state) {
         <h1 style="font-size:22px;">Dashboard</h1>
       </div>
       <div class="right">
+        <button class="btn btn-ghost btn-sm" id="formula-btn">φ Formula valori</button>
         <button class="btn btn-ghost btn-sm" id="update-csv-btn">↻ Carica nuovo CSV (aggiorna)</button>
       </div>
     </div>
@@ -269,6 +270,10 @@ function renderDashboard(state) {
   document.getElementById("update-csv-btn").addEventListener("click", () => {
     renderUploadForUpdate(teams.map((t) => t.name));
   });
+
+  document.getElementById("formula-btn").addEventListener("click", () => {
+    renderFormulaPanel(state);
+  });
 }
 
 function renderUploadForUpdate(knownTeamNames) {
@@ -343,6 +348,168 @@ async function submitMerge(csvPath, newTeamCredits, statusEl) {
   } catch (err) {
     statusEl.textContent = `Errore: ${err.message}`;
   }
+}
+
+function drawHistogram(canvas, values, opts) {
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  const styles = getComputedStyle(document.documentElement);
+  const gridColor = styles.getPropertyValue("--line-soft").trim() || "#333";
+  const barColor = opts.color || styles.getPropertyValue("--accent").trim() || "#4c9a6a";
+  const textColor = styles.getPropertyValue("--text-faint").trim() || "#888";
+
+  const nBins = opts.bins || 20;
+  const min = opts.min !== undefined ? opts.min : Math.min(...values);
+  const max = opts.max !== undefined ? opts.max : Math.max(...values);
+  const span = max - min || 1;
+  const counts = new Array(nBins).fill(0);
+  for (const v of values) {
+    let idx = Math.floor(((v - min) / span) * nBins);
+    if (idx < 0) idx = 0;
+    if (idx >= nBins) idx = nBins - 1;
+    counts[idx]++;
+  }
+  const maxCount = Math.max(...counts, 1);
+
+  const padBottom = 18;
+  const padTop = 6;
+  const plotH = h - padBottom - padTop;
+  const barW = w / nBins;
+
+  ctx.strokeStyle = gridColor;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, h - padBottom + 0.5);
+  ctx.lineTo(w, h - padBottom + 0.5);
+  ctx.stroke();
+
+  ctx.fillStyle = barColor;
+  counts.forEach((c, i) => {
+    const barH = (c / maxCount) * plotH;
+    ctx.fillRect(i * barW + 1, h - padBottom - barH, Math.max(barW - 2, 1), barH);
+  });
+
+  ctx.fillStyle = textColor;
+  ctx.font = "10px ui-monospace, monospace";
+  ctx.textAlign = "left";
+  ctx.fillText(opts.minLabel !== undefined ? opts.minLabel : min.toFixed(2), 2, h - 4);
+  ctx.textAlign = "right";
+  ctx.fillText(opts.maxLabel !== undefined ? opts.maxLabel : max.toFixed(2), w - 2, h - 4);
+}
+
+function renderFormulaPanel(state) {
+  const p = state.params;
+  const quotWeight = Math.round((1 - p.phi) * 100);
+
+  appBody.innerHTML = `
+    <div>
+      <div class="eyebrow">Valori Svincolo</div>
+      <h1>Normalizzazione FVM / QUOT</h1>
+      <p class="sub">FVM e QUOT vengono compressi e tagliati separatamente, poi mescolati con φ. Regola e guarda l'istogramma cambiare.</p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Peso FVM / QUOT</h2></div>
+      <div class="field">
+        <label for="phi-slider">φ (peso QUOT %) <span class="edit-icon" title="Quanto pesano FVM e QUOT nel punteggio finale. Alza per dare piu' peso al QUOT (prezzo di mercato reale), abbassa per dare piu' peso al FVM (proiezione fantavoto). phi=1 -> solo FVM, phi=0 -> solo QUOT.">?</span></label>
+        <input type="range" id="phi-slider" min="0" max="100" value="${quotWeight}" style="width:100%;" />
+        <span class="sub mono" id="phi-value">QUOT ${quotWeight}% / FVM ${100 - quotWeight}%</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Compressione logaritmica</h2></div>
+      <div class="field-row">
+        <div class="field">
+          <label for="alphaF-input">α<sub>F</sub> (FVM) <span class="edit-icon" title="Comprime i valori FVM molto alti prima di normalizzare. Alza per appiattire di piu' le differenze tra i top player, abbassa (verso 0.0001) per comprimere pochissimo.">?</span></label>
+          <input class="input mono" id="alphaF-input" value="${p.alphaF}" />
+        </div>
+        <div class="field">
+          <label for="alphaQ-input">α<sub>Q</sub> (QUOT) <span class="edit-icon" title="Comprime i valori QUOT molto alti prima di normalizzare. Stesso principio di alpha_F ma sul prezzo di mercato.">?</span></label>
+          <input class="input mono" id="alphaQ-input" value="${p.alphaQ}" />
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Taglio percentile</h2></div>
+      <div class="field-row">
+        <div class="field">
+          <label for="pLow-input">p<sub>low</sub> <span class="edit-icon" title="Percentile basso da tagliare prima di normalizzare (0-1). Alza per ignorare i valori piu' bassi. Default 0 = nessun taglio.">?</span></label>
+          <input class="input mono" id="pLow-input" value="${p.pLow}" />
+        </div>
+        <div class="field">
+          <label for="pHigh-input">p<sub>high</sub> <span class="edit-icon" title="Percentile alto da tagliare prima di normalizzare (0-1). Abbassa per ignorare i valori piu' alti. Default 1 = nessun taglio.">?</span></label>
+          <input class="input mono" id="pHigh-input" value="${p.pHigh}" />
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Distribuzione punteggi normalizzati (0-1)</h2></div>
+      <div class="field-row">
+        <div class="field">
+          <label>F_score (FVM)</label>
+          <canvas id="hist-fscore" width="480" height="140" style="width:100%; height:140px;"></canvas>
+        </div>
+        <div class="field">
+          <label>Q_score (QUOT)</label>
+          <canvas id="hist-qscore" width="480" height="140" style="width:100%; height:140px;"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-bar">
+      <div></div>
+      <div class="footer-actions">
+        <button class="btn btn-ghost" id="formula-back-btn">← Torna alla dashboard</button>
+        <button class="btn btn-primary" id="formula-apply-btn">Applica</button>
+      </div>
+    </div>
+    <p class="sub" id="formula-status"></p>
+  `;
+
+  const redraw = () => {
+    const fScores = state.scores.map((s) => s.fScore);
+    const qScores = state.scores.map((s) => s.qScore);
+    drawHistogram(document.getElementById("hist-fscore"), fScores, { min: 0, max: 1, color: getComputedStyle(document.documentElement).getPropertyValue("--accent") });
+    drawHistogram(document.getElementById("hist-qscore"), qScores, { min: 0, max: 1, color: getComputedStyle(document.documentElement).getPropertyValue("--gold") });
+  };
+  redraw();
+
+  document.getElementById("phi-slider").addEventListener("input", (event) => {
+    const qw = parseInt(event.target.value, 10);
+    document.getElementById("phi-value").textContent = `QUOT ${qw}% / FVM ${100 - qw}%`;
+  });
+
+  document.getElementById("formula-back-btn").addEventListener("click", () => loadAndRender());
+
+  document.getElementById("formula-apply-btn").addEventListener("click", async () => {
+    const statusEl = document.getElementById("formula-status");
+    const qw = parseInt(document.getElementById("phi-slider").value, 10);
+    const phi = 1 - qw / 100;
+    const alphaF = parseFloat(document.getElementById("alphaF-input").value);
+    const alphaQ = parseFloat(document.getElementById("alphaQ-input").value);
+    const pLow = parseFloat(document.getElementById("pLow-input").value);
+    const pHigh = parseFloat(document.getElementById("pHigh-input").value);
+
+    if ([alphaF, alphaQ, pLow, pHigh].some((v) => Number.isNaN(v))) {
+      statusEl.textContent = "Errore: valori non validi.";
+      return;
+    }
+
+    statusEl.textContent = "MATLAB sta ricalcolando i punteggi…";
+    try {
+      await postAction("setFormulaParams", { phi, alphaF, alphaQ, pLow, pHigh });
+      const newState = await fetchState();
+      renderFormulaPanel(newState);
+    } catch (err) {
+      statusEl.textContent = `Errore: ${err.message}`;
+    }
+  });
 }
 
 async function renderLeagueBar() {
