@@ -211,7 +211,7 @@ function renderDashboard(state) {
     </div>
     <div class="stat-grid">
       <div class="stat"><span class="k">Squadre</span><span class="v">${teams.length}</span></div>
-      <div class="stat"><span class="k">Epsilon</span><span class="v gold">${state.epsilon}</span></div>
+      <div class="stat"><span class="k">Epsilon</span><span class="v gold">${state.epsilon} <span class="edit-icon" id="edit-epsilon-btn" style="font-size:12px; vertical-align:middle;">✎</span></span></div>
       <div class="stat"><span class="k">Banca totale</span><span class="v">${totalBanca}</span></div>
       <div class="stat"><span class="k">Bonus/Malus totale</span><span class="v ${totalBonusMalus >= 0 ? "accent" : "gold"}">${totalBonusMalus}</span></div>
       <div class="stat"><span class="k">Residuo totale</span><span class="v accent">${totalResiduo}</span></div>
@@ -296,6 +296,19 @@ function renderDashboard(state) {
 
   document.getElementById("players-btn").addEventListener("click", () => {
     renderPlayerList(state);
+  });
+
+  document.getElementById("edit-epsilon-btn").addEventListener("click", () => {
+    openModal({
+      title: "Modifica Epsilon",
+      fields: [{ key: "epsilon", label: "Epsilon", value: state.epsilon }],
+      onSubmit: async ({ epsilon }) => {
+        const numeric = parseFloat(epsilon);
+        if (Number.isNaN(numeric)) throw new Error("Inserisci un numero valido.");
+        await postAction("setEpsilon", { epsilon: numeric });
+        await loadAndRender();
+      },
+    });
   });
 }
 
