@@ -15,6 +15,7 @@ function exportLegaJson(state, jsonPath)
     out.players = table2struct(state.players);
     out.params = state.params;
     out.scores = table2struct(state.scores);
+    out.roleSuggestion = state.roleSuggestion;
 
     out.teams = struct();
     teamsTable = state.teams.table;

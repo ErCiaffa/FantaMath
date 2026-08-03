@@ -11,6 +11,7 @@ classdef LeagueState
             state.teams.table = emptyTeamsTable();
             state.teams.transactions = emptyTransactionTable();
             state.teams.released = zeros(0, 1);
+            state.roleSuggestion = defaultRoleSuggestion();
         end
 
         function state = createFromCsv(csvFile, creditiMap, epsilonValue)
@@ -57,6 +58,7 @@ classdef LeagueState
             n = height(state.players);
             if n == 0
                 state.scores = emptyScoresTable();
+                state.roleSuggestion = defaultRoleSuggestion();
                 return
             end
             p = state.params;
@@ -72,6 +74,7 @@ classdef LeagueState
 
             state.scores = table(state.players.id, fScore, qScore, score, rf.RoleFactor, rf.Flex, rf.PesoRuolo, ...
                 'VariableNames', {'id', 'fScore', 'qScore', 'score', 'roleFactor', 'flex', 'pesoRuolo'});
+            state.roleSuggestion = computeRoleSuggestion(state.players, scarcity);
         end
 
         function state = setFormulaParams(state, phi, alphaF, alphaQ, pLow, pHigh)
@@ -111,6 +114,32 @@ classdef LeagueState
             state.params.nmax = nmax;
             state.params.beta = beta;
             state.params.rho = rho;
+            state = src.state.LeagueState.recomputeScores(state);
+        end
+
+        function state = setRoleOverride(state, overrides)
+            % overrides: struct with a field per Mantra role token (A, B, C, Dc, Dd, Ds, E,
+            % M, Pc, Por, T, W), each a positive multiplier applied to that role's ScarNorm
+            % before roleFactor's per-player MAX is taken (see roleFactor.m).
+            arguments
+                state struct
+                overrides (1,1) struct
+            end
+            whitelist = ["A", "B", "C", "Dc", "Dd", "Ds", "E", "M", "Pc", "Por", "T", "W"];
+            missing = whitelist(~isfield(overrides, cellstr(whitelist)));
+            if ~isempty(missing)
+                error('FantaManager:formula:missingRoleOverride', ...
+                    'Modificatore ruolo mancante per: %s.', strjoin(missing, ', '));
+            end
+            for i = 1:numel(whitelist)
+                tok = char(whitelist(i));
+                val = overrides.(tok);
+                if ~(isnumeric(val) && isscalar(val) && isfinite(val) && val > 0)
+                    error('FantaManager:formula:invalidRoleOverride', ...
+                        'Modificatore ruolo "%s" deve essere un numero positivo finito.', tok);
+                end
+                state.params.roleOverride.(tok) = double(val);
+            end
             state = src.state.LeagueState.recomputeScores(state);
         end
 
@@ -235,7 +264,94 @@ end
 
 function p = defaultFormulaParams()
     p = struct('phi', 0.5, 'alphaF', 0.0005, 'alphaQ', 0.0005, 'pLow', 0, 'pHigh', 1, ...
-        'qw', 1, 'mixOwned', 1, 'eta', 1, 'nmax', 3, 'beta', 0.2, 'rho', 1, 'roleOverride', struct());
+        'qw', 1, 'mixOwned', 1, 'eta', 1, 'nmax', 3, 'beta', 0.2, 'rho', 1, ...
+        'roleOverride', defaultRoleOverride());
+end
+
+function o = defaultRoleOverride()
+    tokens = ["A", "B", "C", "Dc", "Dd", "Ds", "E", "M", "Pc", "Por", "T", "W"];
+    o = struct();
+    for i = 1:numel(tokens)
+        o.(char(tokens(i))) = 1.0;
+    end
+end
+
+function s = defaultRoleSuggestion()
+    % Neutral suggestion (no scarcity data yet, e.g. before a listone is loaded): every field
+    % zeroed/neutral, recommended override=1.0 (no nudge).
+    tokens = ["A", "B", "C", "Dc", "Dd", "Ds", "E", "M", "Pc", "Por", "T", "W"];
+    s = struct();
+    for i = 1:numel(tokens)
+        s.(char(tokens(i))) = struct('scarNorm', 1.0, 'nOwned', 0, 'nFree', 0, ...
+            'fvmOwned', 0, 'fvmFree', 0, 'gapPct', 0, 'recommended', 1.0);
+    end
+end
+
+function s = computeRoleSuggestion(players, scarcity)
+    % "Consigliato" reference column for the Ruoli UI page (2026-08-03 decision, see
+    % docs/decisioni-e-logica.md). Superseded the original ScarNorm+offensive-bump heuristic:
+    % the league owner pointed out that headcount-based ScarNorm doesn't capture "how much
+    % worse are the free agents left, if I have to replace this player" -- the actual
+    % svincolo-relevant question. Measured directly instead: for each role, the gap between
+    % the average FVM of OWNED players and of FREE AGENTS still available (fuoriLista
+    % excluded from both). A role where free agents are much weaker than what's owned (e.g.
+    % Pc, Por -- see the "0 free goalkeepers above FVM 20" finding logged in this session) is
+    % expensive to lose and hard to replace, regardless of what a headcount ratio says.
+    %
+    % gapPct = (fvmOwned - fvmFree) / fvmOwned * 100 -- normalized to each role's own FVM
+    % scale so goalkeepers (low absolute FVM) aren't unfairly discounted next to forwards
+    % (high absolute FVM). recommended is a plain min-max of gapPct across all 12 roles onto
+    % [1.00, 1.20] (the owner's explicit cap) -- the role with the smallest gap (easiest to
+    % replace) lands at 1.00, the role with the largest gap (hardest to replace) at 1.20,
+    % every other role its own value in between (2026-08-03: "ogni ruolo proprio mod", no
+    % more shared tiers).
+    tokens = ["A", "B", "C", "Dc", "Dd", "Ds", "E", "M", "Pc", "Por", "T", "W"];
+    n = numel(tokens);
+
+    included = ~players.fuoriLista;
+    nOwned = zeros(1, n);
+    nFree = zeros(1, n);
+    fvmOwnedSum = zeros(1, n);
+    fvmFreeSum = zeros(1, n);
+
+    idxOf = containers.Map(cellstr(tokens), num2cell(1:n));
+    rows = find(included)';
+    for g = rows
+        rowTokens = string(players.roleTokens{g});
+        rowTokens = rowTokens(strlength(rowTokens) > 0);
+        for t = 1:numel(rowTokens)
+            tok = char(rowTokens(t));
+            if ~isKey(idxOf, tok)
+                continue
+            end
+            idx = idxOf(tok);
+            if players.owned(g)
+                nOwned(idx) = nOwned(idx) + 1;
+                fvmOwnedSum(idx) = fvmOwnedSum(idx) + players.fvm(g);
+            else
+                nFree(idx) = nFree(idx) + 1;
+                fvmFreeSum(idx) = fvmFreeSum(idx) + players.fvm(g);
+            end
+        end
+    end
+
+    fvmOwnedAvg = fvmOwnedSum ./ max(1, nOwned);
+    fvmFreeAvg = fvmFreeSum ./ max(1, nFree);
+    gapPct = zeros(1, n);
+    validMask = fvmOwnedAvg > 0;
+    gapPct(validMask) = (fvmOwnedAvg(validMask) - fvmFreeAvg(validMask)) ./ fvmOwnedAvg(validMask) * 100;
+
+    minGap = min(gapPct);
+    range = max(max(gapPct) - minGap, 1e-9);
+    recommended = 1.0 + 0.20 * (gapPct - minGap) / range;
+
+    s = struct();
+    for i = 1:n
+        tok = char(tokens(i));
+        s.(tok) = struct('scarNorm', scarcity.ScarNorm(tok), 'nOwned', nOwned(i), 'nFree', nFree(i), ...
+            'fvmOwned', fvmOwnedAvg(i), 'fvmFree', fvmFreeAvg(i), 'gapPct', gapPct(i), ...
+            'recommended', recommended(i));
+    end
 end
 
 function t = emptyScoresTable()

@@ -179,5 +179,43 @@ questo limite di stabilità esplicitamente accettato, non ignorato.
 - **Prossimo**: età (`ageWeight`), poi floor, poi conversione finale in crediti
   (`assembleWeight`→`auctionPrice`/`releaseValue`, con `rho` basso per non far dominare il
   ruolo sulla forza del giocatore).
+- **2026-08-03**: `rho` non ancora deciso da modificare — il proprietario lega ha scelto
+  invece di esporre `roleOverride` (già presente in `roleFactor.m` come knob non ancora
+  raggiungibile da UI) in una pagina dedicata "Ruoli" (navbar), con un moltiplicatore
+  manuale editabile per ognuno dei 12 ruoli Mantra, applicato PRIMA del MAX in `roleFactor`.
+  Default di tutti i 12 = 1.0 (nessun cambiamento ai punteggi attuali, esplicitamente
+  richiesto — la valutazione dei valori resta manuale, decisa dal proprietario). Aggiunto
+  `LeagueState.setRoleOverride` (valida tutti e 12 i token presenti, ognuno > 0) e azione
+  coda `setRoleOverride`. La colonna "Consigliato" mostrata in UI è solo di riferimento
+  (mai applicata in automatico): calcolata dal `ScarNorm` reale per ruolo (ricavato da
+  `roleDemand`+`roleScarcity` sui dati della lega attiva) con una piccola spinta (+0.35 ×
+  quanto il ruolo è sotto scarsità media) solo sui ruoli puramente offensivi abbondanti
+  (E, W, T, Pc) — richiesta esplicita: "gli attaccanti sono quelli con più bonus, ruoli
+  offensivi prima", ma "pesato leggermente", non un ribaltamento come il semplice
+  S×PesoRuolo con rho=1 già scartato in precedenza.
+- **2026-08-03 (correzione)**: la prima versione della colonna "Consigliato" era hardcoded
+  nel frontend (numeri statici scritti a mano, presi da un calcolo offline una tantum) —
+  il proprietario ha fatto notare correttamente che non usava davvero la formula/i dati
+  reali della lega. Corretto: `LeagueState.recomputeScores` ora calcola anche
+  `state.roleSuggestion` (per ognuno dei 12 token: `scarNorm` reale da
+  `roleScarcity.ScarNorm`, `recommended` = stessa regola di prima ma dal valore live),
+  esportato in `lega.json`. Il frontend legge `state.roleSuggestion`, niente più numeri
+  statici — cambia automaticamente se cambiano listone/rose/parametri scarsità.
+- **2026-08-03 (seconda correzione, definitiva per ora)**: anche la versione "ScarNorm +
+  bump offensivo" era sbagliata — il proprietario ha fatto notare che ScarNorm (conteggio
+  teste demand/supply) non risponde alla vera domanda per lo svincolo: "se perdo questo
+  giocatore, quanto sono peggiori le alternative libere rimaste?". Verificato sui dati
+  reali: Por ha lo svincolo più critico di tutti (11 portieri con FVM≥20 su 67, **tutti già
+  posseduti, zero liberi**) — ScarNorm da solo non lo segnalava. Sostituito con una metrica
+  diretta: per ogni ruolo, gap% = (FVM medio posseduti − FVM medio liberi) / FVM medio
+  posseduti × 100 (normalizzato per scala, così portieri e attaccanti sono confrontabili
+  nonostante FVM assoluti molto diversi). `recommended` = min-max di gap% su tutti i 12
+  ruoli, mappato su [1.00, 1.20] (tetto esplicito del proprietario) — il ruolo con gap%
+  minimo (B, 40%) = 1.00, quello con gap% massimo (Por, 95%) = 1.20, ogni ruolo il suo
+  valore individuale ("ogni ruolo proprio mod", non più tier condivisi). Implementato in
+  `LeagueState.computeRoleSuggestion` (ora prende anche `players`, non solo `scarcity`).
+  Pagina "Ruoli" estesa con tabella completa (posseduti/liberi/FVM/gap%/ScarNorm) e due
+  grafici a barre (disponibilità per ruolo, gap% per ruolo) per decidere con i dati davanti,
+  non alla cieca.
 
 *(continua ad ogni nuova decisione)*

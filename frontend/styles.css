@@ -271,6 +271,17 @@
     font-size: 12px; color: var(--text-faint); font-weight: 600;
   }
 
+  /* role bars (Ruoli page) */
+  .legend-row { display: flex; gap: 18px; margin-bottom: 10px; }
+  .legend-row .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+  .role-bar-row { display: grid; grid-template-columns: 40px 1fr 70px; align-items: center; gap: 10px; padding: 4px 0; }
+  .role-bar-lbl { font-size: 12.5px; color: var(--text-hi); }
+  .role-bar-track { position: relative; height: 14px; }
+  .role-bar-track-double { height: 22px; }
+  .role-bar-fill { position: absolute; top: 0; height: 14px; border-radius: 0 4px 4px 0; }
+  .role-bar-track-double .role-bar-fill { height: 8px; }
+  .role-bar-val { font-size: 12px; color: var(--text-lo); text-align: right; }
+
   /* table */
   .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
   table { width: 100%; border-collapse: collapse; min-width: 620px; }

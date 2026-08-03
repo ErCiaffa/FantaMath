@@ -116,6 +116,9 @@ function state = applyEntry(state, entry)
             state = src.state.LeagueState.setFormulaParams(state, entry.payload.phi, entry.payload.alphaF, ...
                 entry.payload.alphaQ, entry.payload.pLow, entry.payload.pHigh);
 
+        case "setRoleOverride"
+            state = src.state.LeagueState.setRoleOverride(state, entry.payload.roleOverride);
+
         otherwise
             error('FantaManager:queue:unknownType', 'Tipo azione sconosciuto: "%s".', entry.type);
     end

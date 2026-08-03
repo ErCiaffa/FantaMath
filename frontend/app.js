@@ -645,6 +645,143 @@ function renderFormulaPanel(state) {
   });
 }
 
+const ROLE_LABELS = {
+  Por: "Portiere",
+  Dc: "Difensore centrale",
+  B: "Braccetto",
+  Ds: "Terzino sinistro",
+  Dd: "Terzino destro",
+  M: "Mediano",
+  C: "Centrocampista centrale",
+  E: "Esterno",
+  W: "Ala",
+  T: "Trequartista",
+  Pc: "Punta centrale",
+  A: "Attaccante",
+};
+const ROLE_ORDER = ["Por", "Dc", "B", "Ds", "Dd", "M", "C", "E", "W", "T", "Pc", "A"];
+
+function roleBarRow(label, value, max, color, valueLabel) {
+  const pct = value <= 0 ? 0 : Math.max(2, (value / max) * 100);
+  return `
+    <div class="role-bar-row">
+      <div class="role-bar-lbl mono">${label}</div>
+      <div class="role-bar-track"><div class="role-bar-fill" style="width:${pct}%; background:${color};"></div></div>
+      <div class="role-bar-val mono">${valueLabel}</div>
+    </div>`;
+}
+
+function renderRolesPanel(state) {
+  renderNavbar("roles", true);
+  const overrides = state.params.roleOverride || {};
+  const suggestion = state.roleSuggestion || {};
+  const rows = ROLE_ORDER.map((key) => ({
+    key,
+    ...(suggestion[key] || { scarNorm: 1, nOwned: 0, nFree: 0, fvmOwned: 0, fvmFree: 0, gapPct: 0, recommended: 1 }),
+  }));
+
+  const maxSupply = Math.max(...rows.map((r) => r.nOwned + r.nFree), 1);
+  const maxGap = Math.max(...rows.map((r) => r.gapPct), 1);
+
+  appBody.innerHTML = `
+    <div>
+      <div class="eyebrow">Modificatori</div>
+      <h1>Modificatori Ruolo</h1>
+      <p class="sub">Moltiplicatore manuale applicato alla scarsita' del ruolo (PesoRuolo), prima che entri nel punteggio finale del giocatore. Valore 1.0 = nessun effetto, mai applicato automaticamente — decidi tu.</p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Giocatori disponibili per ruolo</h2>
+        <span class="hint">Posseduti (verde) vs liberi/svincolo (blu), fuori lista esclusi</span></div>
+      <div class="legend-row sub">
+        <span><i class="dot" style="background:var(--accent);"></i> Posseduti</span>
+        <span><i class="dot" style="background:var(--chart-blue);"></i> Liberi</span>
+      </div>
+      ${rows.map((r) => `
+        <div class="role-bar-row">
+          <div class="role-bar-lbl mono">${r.key}</div>
+          <div class="role-bar-track role-bar-track-double">
+            <div class="role-bar-fill" style="width:${Math.max(2, r.nOwned / maxSupply * 100)}%; background:var(--accent); top:0;"></div>
+            <div class="role-bar-fill" style="width:${Math.max(2, r.nFree / maxSupply * 100)}%; background:var(--chart-blue); top:10px;"></div>
+          </div>
+          <div class="role-bar-val mono">${r.nOwned}/${r.nOwned + r.nFree}</div>
+        </div>
+      `).join("")}
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Gap FVM posseduti vs liberi (%)</h2>
+        <span class="hint">Quanto sono piu' scarsi i liberi rimasti — piu' alto = piu' difficile sostituire chi possiedi</span></div>
+      ${rows.map((r) => roleBarRow(r.key, r.gapPct, maxGap, "var(--gold)", `${r.gapPct.toFixed(0)}%`)).join("")}
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Tabella completa e modificatori</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Ruolo</th><th>Nome</th><th>Poss.</th><th>Liberi</th>
+              <th>FVM poss.</th><th>FVM liberi</th><th>Gap%</th>
+              <th>ScarNorm</th><th>Consigliato</th><th>Modificatore</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map((r) => `
+              <tr>
+                <td class="mono">${r.key}</td>
+                <td>${ROLE_LABELS[r.key]}</td>
+                <td class="mono sub">${r.nOwned}</td>
+                <td class="mono sub">${r.nFree}</td>
+                <td class="mono sub">${r.fvmOwned.toFixed(1)}</td>
+                <td class="mono sub">${r.fvmFree.toFixed(1)}</td>
+                <td class="mono sub">${r.gapPct.toFixed(0)}%</td>
+                <td class="mono sub">${r.scarNorm.toFixed(2)}</td>
+                <td class="mono sub">${r.recommended.toFixed(2)}</td>
+                <td><input class="input mono" style="width:6rem;" id="role-override-${r.key}" value="${
+                  overrides[r.key] !== undefined ? overrides[r.key] : 1.0
+                }" /></td>
+              </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="footer-bar">
+      <div></div>
+      <div class="footer-actions">
+        <button class="btn btn-ghost" id="roles-back-btn">← Torna alla dashboard</button>
+        <button class="btn btn-primary" id="roles-apply-btn">Salva</button>
+      </div>
+    </div>
+    <p class="sub" id="roles-status"></p>
+  `;
+
+  document.getElementById("roles-back-btn").addEventListener("click", () => loadAndRender());
+
+  document.getElementById("roles-apply-btn").addEventListener("click", async () => {
+    const statusEl = document.getElementById("roles-status");
+    const roleOverride = {};
+    for (const key of ROLE_ORDER) {
+      const val = parseFloat(document.getElementById(`role-override-${key}`).value);
+      if (Number.isNaN(val) || val <= 0) {
+        statusEl.textContent = `Errore: modificatore "${key}" non valido (deve essere > 0).`;
+        return;
+      }
+      roleOverride[key] = val;
+    }
+
+    statusEl.textContent = "MATLAB sta ricalcolando i punteggi…";
+    try {
+      await postAction("setRoleOverride", { roleOverride });
+      const newState = await fetchState();
+      renderRolesPanel(newState);
+    } catch (err) {
+      statusEl.textContent = `Errore: ${err.message}`;
+    }
+  });
+}
+
 function renderPlayerList(state) {
   renderNavbar("players", true);
   const scoresById = new Map(state.scores.map((s) => [s.id, s]));
@@ -844,6 +981,7 @@ function renderNavbar(active, hasLeague) {
     { key: "dashboard", label: "Dashboard", fn: () => loadAndRender() },
     { key: "players", label: "☰ Lista giocatori", fn: () => fetchState().then(renderPlayerList) },
     { key: "formula", label: "φ Formula valori", fn: () => fetchState().then(renderFormulaPanel) },
+    { key: "roles", label: "⚽ Ruoli", fn: () => fetchState().then(renderRolesPanel) },
   ];
   const nav = document.getElementById("navbar");
   if (!hasLeague) {
