@@ -1,85 +1,143 @@
 # FantaManager
 
-Motore di valutazione economica per una lega Fantacalcio manageriale (Mantra) pluriennale.
-Calcola il **valore di svincolo/asta** di ogni giocatore da FVM/QUOT ufficiali + scarsità
-ruolo + età + tassazione, gestisce budget/rose/transazioni delle squadre nel tempo, ed
-esporta liste prezzi da usare durante asta/svincoli reali.
+Motore di valutazione economica per una lega Fantacalcio manageriale (regole Mantra)
+pluriennale. Calcola il valore di svincolo e di asta di ogni giocatore a partire da FVM e
+quotazione ufficiali, scarsità di ruolo, età e tassazione; gestisce budget, rose e
+transazioni delle squadre nel tempo; esporta liste prezzi utilizzabili in asta e agli
+svincoli reali.
 
-Non è un semplice listone/quotazioni: la scarsità di ruolo è calcolata sui dati reali della
-tua lega (non generica), il modello economico è multi-stagione (plusvalenza/minusvalenza,
-tassazione differenziata per motivo di svincolo), e c'è un invariante di budget verificabile
-— se tutti i giocatori posseduti venissero svincolati oggi, il netto totale (dopo tasse)
-torna esatto al budget della lega.
+## Indice
 
-## Per chi consulta (membri lega)
+- [Cosa fa](#cosa-fa)
+- [Per i membri della lega](#per-i-membri-della-lega)
+- [Per il proprietario della lega](#per-il-proprietario-della-lega)
+- [Architettura](#architettura)
+- [Struttura del repository](#struttura-del-repository)
+- [Test](#test)
+- [Documentazione](#documentazione)
 
-Apri l'URL della lega (te lo dà il proprietario, di solito `http://<ip>:8420`) e trovi:
+## Cosa fa
 
-- **Dashboard**: banca, bonus/malus, valore rosa (netto svincolo) e totale per ogni squadra.
-- **Lista giocatori**: tutti i giocatori del listone, cerca per nome, filtra per ruolo
-  (multi-selezione), FantaSquadra e possesso (posseduti/svincolati). Bottone "Esporta
-  listone xlsx" per scaricare il listone completo aggiornato.
-- **Dettaglio squadra** (click sul nome squadra in dashboard): rosa, miglior modulo Mantra
-  schierabile, profondità panchina per ruolo, valore lordo/netto per giocatore.
-- **Ruoli / Età / Tasse / Formula valori**: solo il proprietario lega modifica questi
-  parametri — qui i membri possono comunque vedere come sono tarati.
+A differenza di un semplice listone/quotazioni, FantaManager combina:
 
-Nessuno tranne il proprietario modifica parametri; i valori mostrati sono quelli ufficiali
-della lega in quel momento.
+- **Scarsità di ruolo reale**, calcolata sui dati della lega attiva (non una stima
+  generica).
+- **Modello economico multi-stagione**: plusvalenza/minusvalenza, tassazione differenziata
+  per motivo di svincolo (estero vs. decisionale).
+- **Invariante di budget verificabile**: se tutti i giocatori posseduti venissero
+  svincolati oggi, contemporaneamente, il netto totale (dopo tasse) torna esatto al budget
+  della lega — non un'approssimazione, un vincolo matematico verificato ad ogni ricalcolo.
+- **Parametri completamente tarabili** dal proprietario della lega (normalizzazione,
+  modificatori di ruolo, età, tassazione, conversione in crediti) — nessun numero nascosto
+  nel codice.
 
-## Per chi fa girare l'app (proprietario lega)
+La formula completa, con ogni passaggio e razionale, è documentata in
+[`docs/FORMULE.md`](docs/FORMULE.md).
 
-Serve MATLAB (con licenza) e Python 3.
+## Per i membri della lega
+
+Apri l'URL fornito dal proprietario della lega (tipicamente `http://<host>:8420`).
+
+| Pagina | Cosa mostra |
+|---|---|
+| **Dashboard** | Banca, bonus/malus, valore rosa (netto svincolo) e totale, per ogni squadra |
+| **Lista giocatori** | Listone completo: ricerca per nome, filtro ruolo (multi-selezione), filtro FantaSquadra, filtro possesso (posseduti/svincolati). Esportazione xlsx del listone aggiornato |
+| **Dettaglio squadra** | Rosa, miglior modulo Mantra schierabile, profondità panchina per ruolo, valore lordo/netto di ogni giocatore |
+| **Ruoli / Età / Tasse / Formula valori** | Parametri di calcolo attualmente in uso — sola lettura per i membri, modificabili solo dal proprietario |
+
+## Per il proprietario della lega
+
+### Requisiti
+
+- MATLAB (con licenza) — motore di calcolo.
+- Python 3.10+ — bridge web.
+
+### Avvio
 
 ```bash
-# Setup una tantum
 cd FantaManager
+
+# Setup una tantum
 python -m venv .venv
 .venv\Scripts\pip install -r server\requirements.txt
 
-# Ogni volta che vuoi far girare l'app (due processi separati, entrambi devono restare avviati)
+# Ad ogni avvio: due processi indipendenti, entrambi devono restare attivi
 .venv\Scripts\python.exe -m uvicorn server.main:app --host 127.0.0.1 --port 8420
 matlab -batch "addpath(pwd); watchLeague"
 ```
 
-Poi apri `http://127.0.0.1:8420/`. Il primo avvio ti guida nella creazione di una lega
-(carica il CSV/xlsx del listone, imposta i crediti iniziali per squadra).
+Apri `http://127.0.0.1:8420/`. Il primo avvio guida nella creazione di una lega: caricamento
+del listone (CSV/xlsx) e crediti iniziali per squadra.
 
-**Aggiornare il listone**: usa il pulsante "Carica nuovo CSV" in dashboard — fa merge col
-listone esistente (ruolo/squadra/FVM/QUOT aggiornati; chi non è più nel nuovo listone va
-fuori lista; chi è nuovo entra senza FantaSquadra/Costo). `Costo`/`FantaSquadra` esistenti
-non si toccano mai in automatico.
+### Aggiornare il listone
 
-`config/` (dati reali della lega — rose, crediti, transazioni) **non è versionato**
-apposta: resta locale a chi fa girare l'app, non finisce su GitHub.
+Pulsante "Carica nuovo CSV" in dashboard. Il merge con il listone esistente:
+
+- aggiorna ruolo, squadra, FVM e quotazione per ogni giocatore già presente;
+- marca come fuori lista chi non compare più nel nuovo listone;
+- inserisce i nuovi giocatori senza FantaSquadra né costo assegnati.
+
+`Costo` e `FantaSquadra` di un giocatore già posseduto non vengono mai sovrascritti in
+automatico.
+
+### Dati della lega
+
+`config/` (rose, crediti, transazioni — i dati reali della lega) **non è versionato**: resta
+locale a chi fa girare l'app e non viene mai pubblicato su GitHub.
 
 ## Architettura
 
-- **Motore** (`+src/+state`, `+src/+io`, `+src/+engine`): MATLAB, logica di business e
-  validazione, testato con `matlab.unittest` (74 test).
-- **Bridge** (`server/`): FastAPI, espone `state` come JSON, riceve azioni via coda file
-  (`config/leagues/<slug>/queue.json`) che MATLAB processa ogni 2 secondi.
+```
+Frontend (HTML/CSS/JS statico)
+        │  HTTP
+        ▼
+Bridge FastAPI (server/) ── coda file (queue.json) ──▶ Poller MATLAB (watchLeague.m, tick 2s)
+        ▲                                                        │
+        └──────────────── lega.json (stato esportato) ◀──────────┘
+```
+
+- **Motore** (`+src/+state`, `+src/+io`, `+src/+engine`): MATLAB. Logica di business,
+  validazione, formule di valutazione.
+- **Bridge** (`server/`): FastAPI. Espone lo stato come JSON, riceve le azioni dell'utente
+  (modifica banca, bonus/malus, upload listone, cambio parametri) e le mette in coda.
+- **Poller** (`watchLeague.m`): MATLAB, processo separato. Applica le azioni in coda allo
+  stato, ricalcola i punteggi, riesporta il JSON. Nessuna scrittura diretta dal web allo
+  stato — tutte le modifiche passano dalla coda.
 - **Frontend** (`frontend/`): HTML/CSS/JS statico, nessun framework.
 
-Il MATLAB poller (`watchLeague.m`) e il server FastAPI sono **due processi indipendenti**:
-se modifichi il codice MATLAB o Python, vanno riavviati per caricare le modifiche (non
-c'è hot-reload).
+Bridge e poller sono processi indipendenti: modifiche al codice MATLAB o Python richiedono
+il riavvio del rispettivo processo (nessun hot-reload).
 
-## Documentazione
+## Struttura del repository
 
-- `PRODUCT.md` — cosa fa il prodotto e per chi, in breve.
-- `docs/decisioni-e-logica.md` — log vivo di ogni decisione di design/parametro presa
-  durante lo sviluppo, con le formule esatte usate dal motore. Leggilo prima di ogni
-  modifica strutturale alla formula di valore.
-- `docs/normalizzazione-fvm-quot.md` — analisi dettagliata della normalizzazione FVM/QUOT.
-- `HANDOFF.md` — stato del lavoro in corso, prossimi passi, bug noti.
+```
++src/+state/       Stato della lega (LeagueState) e i suoi metodi
++src/+io/           Import/merge del listone, export JSON
++src/+engine/       Formule di valutazione (normalizzazione, scarsità, età, tasse, ...)
++src/+app/          Elaborazione della coda azioni (processQueue)
+server/             Bridge FastAPI
+frontend/           UI web statica
+tests/              Test MATLAB (matlab.unittest) e fixture
+server/tests/       Test Python (pytest)
+docs/                Documentazione tecnica
+```
 
 ## Test
 
 ```bash
-# MATLAB (74 test)
+# MATLAB
 matlab -batch "addpath(pwd); runtests('tests', 'IncludeSubfolders', true)"
 
-# Python (9 test)
+# Python
 cd server && python -m pytest tests/ -q
 ```
+
+## Documentazione
+
+| Documento | Contenuto |
+|---|---|
+| [`docs/FORMULE.md`](docs/FORMULE.md) | Modello di valutazione completo: ogni formula, parametro e razionale |
+| [`docs/normalizzazione-fvm-quot.md`](docs/normalizzazione-fvm-quot.md) | Analisi dettagliata della normalizzazione FVM/QUOT |
+| [`docs/decisioni-e-logica.md`](docs/decisioni-e-logica.md) | Log cronologico delle decisioni di design prese durante lo sviluppo |
+| [`PRODUCT.md`](PRODUCT.md) | Obiettivo del prodotto, utenti, vincoli |
+| [`HANDOFF.md`](HANDOFF.md) | Stato del lavoro in corso, bug noti |
