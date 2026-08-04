@@ -47,7 +47,6 @@ classdef LeagueState
             state.meta.lastCsvLoadedAt = datetime('now');
             state.teams.table = table(teamNames, creditiIniziali, nan(n, 1), zeros(n, 1), ...
                 'VariableNames', {'name', 'creditiIniziali', 'bankOverride', 'teamValue'});
-            state = src.state.LeagueState.recomputeTeamValue(state);
             state = src.state.LeagueState.recomputeScores(state);
         end
 
@@ -59,6 +58,7 @@ classdef LeagueState
             if n == 0
                 state.scores = emptyScoresTable();
                 state.roleSuggestion = defaultRoleSuggestion();
+                state = src.state.LeagueState.recomputeTeamValue(state);
                 return
             end
             p = state.params;
@@ -124,6 +124,11 @@ classdef LeagueState
                 'VariableNames', {'id', 'fScore', 'qScore', 'score', 'roleFactor', 'flex', 'pesoRuolo', ...
                 'etaWeight', 'mod', 'assembleWeight', 'creditoStimato', 'incassoNettoDecisionale'});
             state.roleSuggestion = computeRoleSuggestion(state.players, scarcity);
+            % Valore squadra = somma del valore di svincolo netto (decisionale, dopo tasse) dei
+            % giocatori posseduti, non il costo pagato in asta (2026-08-04, richiesta esplicita
+            % del proprietario: "quanto vale la rosa oggi", non "quanto ho speso"). Deve girare
+            % DOPO gli scores appena calcolati, da cui prende incassoNettoDecisionale.
+            state = src.state.LeagueState.recomputeTeamValue(state);
         end
 
         function state = setFormulaParams(state, phi, alphaF, alphaQ, pLow, pHigh)
@@ -266,11 +271,20 @@ classdef LeagueState
         end
 
         function state = recomputeTeamValue(state)
+            % Somma, per squadra, il valore di svincolo netto (state.scores.incassoNettoDecisionale)
+            % dei giocatori posseduti -- non il costo pagato in asta. state.scores e' allineato
+            % riga-per-riga a state.players (stesso ordine, costruito da esso in recomputeScores),
+            % quindi la stessa mask booleana funziona su entrambe le tabelle.
             n = height(state.teams.table);
             teamValue = zeros(n, 1);
+            if height(state.scores) == height(state.players)
+                valorePerGiocatore = state.scores.incassoNettoDecisionale;
+            else
+                valorePerGiocatore = zeros(height(state.players), 1);
+            end
             for i = 1:n
                 mask = state.players.owned & state.players.team == state.teams.table.name(i);
-                teamValue(i) = sum(state.players.costo(mask));
+                teamValue(i) = sum(valorePerGiocatore(mask));
             end
             state.teams.table.teamValue = teamValue;
         end

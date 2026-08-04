@@ -14,6 +14,17 @@ function players = loadListone(csvFile)
     end
 
     opts = detectImportOptions(csvFile, 'Delimiter', ';', 'VariableNamingRule', 'preserve');
+    if hasUtf8Bom(csvFile)
+        % Export/merge tooling (Python, Excel "salva come CSV UTF-8") writes a UTF-8 BOM;
+        % without forcing the encoding explicitly, readtable's default falls back to the
+        % system codepage (Windows-1252 on this machine) and silently mangles every accented
+        % name (2026-08-05: "Soulè"/"Laurientè" etc turned into "SoulÃ"/"LaurientÃ" -- not
+        % just wrong, but LOSSY, since the second UTF-8 byte of a trailing accented char gets
+        % dropped entirely by the codepage misread, not just displayed wrong). Files without
+        % a BOM (e.g. tests/fixtures/listone_accents.csv, a genuine Latin-1 export) keep the
+        % previous default behavior untouched.
+        opts.Encoding = 'UTF-8';
+    end
     raw = readtable(csvFile, opts);
 
     originalCols = string(raw.Properties.VariableNames);
@@ -181,6 +192,17 @@ function normalized = normalizeHeaders(names)
     normalized = regexprep(normalized, '^\x{FEFF}', '');
     normalized = lower(strtrim(normalized));
     normalized = regexprep(normalized, '[^a-z0-9]', '');
+end
+
+function tf = hasUtf8Bom(csvFile)
+    fid = fopen(csvFile, 'r');
+    if fid == -1
+        tf = false;
+        return
+    end
+    firstBytes = fread(fid, 3, 'uint8=>uint8')';
+    fclose(fid);
+    tf = numel(firstBytes) == 3 && isequal(firstBytes, uint8([239, 187, 191]));
 end
 
 function w = mantraRoleWhitelist()

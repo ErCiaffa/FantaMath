@@ -30,6 +30,13 @@ function processQueue(queuePath, statePath, jsonPath)
         entries(i).appliedAt = string(datetime('now'));
     end
 
+    % Recompute scores/teamValue unconditionally on every tick, anche senza entry in coda:
+    % un .mat salvato da una versione precedente del codice (es. teamValue = costo pagato,
+    % prima del 2026-08-05) altrimenti resterebbe con valori vecchi per sempre finche' non
+    % arriva un'azione che tocchi la formula. Costo trascurabile rispetto al poll ogni 2s
+    % gia' esistente.
+    state = src.state.LeagueState.recomputeScores(state);
+
     src.state.LeagueState.saveState(state, statePath);
     src.io.exportLegaJson(state, jsonPath);
     writeQueue(queuePath, entries);
@@ -97,7 +104,6 @@ function state = applyEntry(state, entry)
                 state = src.state.LeagueState.addTeam(state, teamNames(i), newTeamCredits(char(teamNames(i))));
             end
 
-            state = src.state.LeagueState.recomputeTeamValue(state);
             state = src.state.LeagueState.recomputeScores(state);
             state.meta.lastCsvPath = string(entry.payload.csvPath);
             state.meta.lastCsvLoadedAt = datetime('now');

@@ -18,6 +18,16 @@ classdef tLoadListoneTest < matlab.unittest.TestCase
             testCase.verifyEqual(players.nome(2), "Soulé");
         end
 
+        function decodesAccentedNamesFromUtf8BomCsv(testCase)
+            % 2026-08-05: file con BOM UTF-8 (com'è l'export della tool di merge Python) letto
+            % col default sbagliato mangiava il secondo byte degli accenti finali ("Soulè" ->
+            % "SoulÃ", perdita di dato, non solo visualizzazione). Vedi hasUtf8Bom in loadListone.m.
+            csvFile = fullfile(fileparts(mfilename('fullpath')), 'fixtures', 'listone_utf8bom.csv');
+            players = src.io.loadListone(string(csvFile));
+            testCase.verifyEqual(players.nome(1), "Laurientè");
+            testCase.verifyEqual(players.nome(2), "Soulè");
+        end
+
         function missingCostoOnOwnedRowThrows(testCase)
             csvFile = fullfile(tempdir, "tLoadListoneTest_missingcost.csv");
             fid = fopen(csvFile, 'w');

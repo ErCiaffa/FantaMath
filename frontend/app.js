@@ -1,5 +1,19 @@
 const appBody = document.getElementById("app-body");
 
+const ICON_PATHS = {
+  grid: '<rect width="7" height="7" x="3" y="3" rx="1.3"/><rect width="7" height="7" x="14" y="3" rx="1.3"/><rect width="7" height="7" x="14" y="14" rx="1.3"/><rect width="7" height="7" x="3" y="14" rx="1.3"/>',
+  list: '<line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/>',
+  users: '<path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  calendar: '<rect width="18" height="18" x="3" y="4" rx="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/>',
+  percent: '<line x1="19" x2="5" y1="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>',
+  refresh: '<path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/>',
+  pencil: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+};
+
+function icon(name, size = 15) {
+  return `<svg class="icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON_PATHS[name]}</svg>`;
+}
+
 document.addEventListener("click", (event) => {
   const existing = document.querySelector(".tip-popup");
   const icon = event.target.closest(".tip-icon");
@@ -127,7 +141,6 @@ function renderError(message) {
 function renderNewLeagueScreen(csvPath, teamNames) {
   appBody.innerHTML = `
     <div>
-      <div class="eyebrow">Primo avvio</div>
       <h1>Configura la tua lega</h1>
       <p class="sub">${teamNames.length} squadre rilevate nel CSV caricato.</p>
     </div>
@@ -173,7 +186,6 @@ function renderNewLeagueScreen(csvPath, teamNames) {
 function renderUploadScreen() {
   appBody.innerHTML = `
     <div>
-      <div class="eyebrow">Primo avvio</div>
       <h1>Configura la tua lega</h1>
       <p class="sub">Nessuna lega salvata trovata. Carica il listone per iniziare.</p>
     </div>
@@ -206,23 +218,20 @@ function renderDashboard(state) {
   const totalBanca = teams.reduce((sum, t) => sum + (isOverrideSet(t.bankOverride) ? t.bankOverride : t.creditiIniziali), 0);
   const totalBonusMalus = teams.reduce((sum, t) => sum + t.bonusMalusSum, 0);
   const totalResiduo = teams.reduce((sum, t) => sum + t.residuo, 0);
-  const totalGenerale = teams.reduce((sum, t) => sum + t.totale, 0);
+  const totalGenerale = Math.ceil(teams.reduce((sum, t) => sum + t.totale, 0));
 
   appBody.innerHTML = `
     <div class="toolbar">
       <div class="left">
-        <div class="eyebrow">Lega caricata</div>
         <h1 style="font-size:22px;">Dashboard</h1>
       </div>
       <div class="right">
-        <button class="btn btn-ghost btn-sm" id="players-btn">☰ Lista giocatori</button>
-        <button class="btn btn-ghost btn-sm" id="formula-btn">φ Formula valori</button>
-        <button class="btn btn-ghost btn-sm" id="update-csv-btn">↻ Carica nuovo CSV (aggiorna)</button>
+        <button class="btn btn-ghost btn-sm" id="update-csv-btn">${icon("refresh", 14)}Carica nuovo CSV (aggiorna)</button>
       </div>
     </div>
     <div class="stat-grid">
       <div class="stat"><span class="k">Squadre</span><span class="v">${teams.length}</span></div>
-      <div class="stat"><span class="k">Epsilon</span><span class="v gold">${state.epsilon} <span class="edit-icon" id="edit-epsilon-btn" style="font-size:12px; vertical-align:middle;">✎</span></span></div>
+      <div class="stat"><span class="k">Epsilon</span><span class="v gold">${state.epsilon} <span class="edit-icon" id="edit-epsilon-btn" style="vertical-align:middle;">${icon("pencil", 12)}</span></span></div>
       <div class="stat"><span class="k">Banca totale</span><span class="v">${totalBanca}</span></div>
       <div class="stat"><span class="k">Bonus/Malus totale</span><span class="v ${totalBonusMalus >= 0 ? "accent" : "gold"}">${totalBonusMalus}</span></div>
       <div class="stat"><span class="k">Residuo totale</span><span class="v accent">${totalResiduo}</span></div>
@@ -242,22 +251,22 @@ function renderDashboard(state) {
           .map((t) => {
             const banca = isOverrideSet(t.bankOverride) ? t.bankOverride : t.creditiIniziali;
             return `<tr>
-              <td class="team-name">${t.name}</td>
+              <td class="team-name"><button class="btn-link" data-team-detail="${t.name}">${t.name}</button></td>
               <td class="num">
                 <div class="bank-cell" style="justify-content:flex-end;">
                   <span class="bank-value ${banca >= 0 ? "pos" : "neg"}">${banca}</span>
-                  <span class="edit-icon" data-edit-banca-for="${t.name}">✎</span>
+                  <span class="edit-icon" data-edit-banca-for="${t.name}">${icon("pencil", 12)}</span>
                 </div>
               </td>
               <td class="num">
                 <div class="bank-cell" style="justify-content:flex-end;">
                   <span class="bank-value ${t.bonusMalusSum >= 0 ? "pos" : "neg"}">${t.bonusMalusSum}</span>
-                  <span class="edit-icon" data-edit-bm-for="${t.name}">✎</span>
+                  <span class="edit-icon" data-edit-bm-for="${t.name}">${icon("pencil", 12)}</span>
                 </div>
               </td>
-              <td class="num mono">${t.teamValue}</td>
+              <td class="num mono">${Math.ceil(t.teamValue)}</td>
               <td class="num mono">${t.residuo}</td>
-              <td class="num mono" style="font-weight:700;">${t.totale}</td>
+              <td class="num mono" style="font-weight:700;">${Math.ceil(t.totale)}</td>
             </tr>`;
           })
           .join("")}</tbody>
@@ -266,6 +275,9 @@ function renderDashboard(state) {
   `;
 
   teams.forEach((t) => {
+    document.querySelector(`[data-team-detail="${CSS.escape(t.name)}"]`).addEventListener("click", () => {
+      renderTeamPanel(state, t.name);
+    });
     document.querySelector(`[data-edit-banca-for="${CSS.escape(t.name)}"]`).addEventListener("click", () => {
       const currentBanca = isOverrideSet(t.bankOverride) ? t.bankOverride : t.creditiIniziali;
       openModal({
@@ -301,14 +313,6 @@ function renderDashboard(state) {
     renderUploadForUpdate(teams.map((t) => t.name));
   });
 
-  document.getElementById("formula-btn").addEventListener("click", () => {
-    renderFormulaPanel(state);
-  });
-
-  document.getElementById("players-btn").addEventListener("click", () => {
-    renderPlayerList(state);
-  });
-
   document.getElementById("edit-epsilon-btn").addEventListener("click", () => {
     openModal({
       title: "Modifica Epsilon",
@@ -326,7 +330,6 @@ function renderDashboard(state) {
 function renderUploadForUpdate(knownTeamNames) {
   appBody.innerHTML = `
     <div>
-      <div class="eyebrow">Aggiornamento</div>
       <h1>Carica nuovo listone</h1>
     </div>
     <div class="panel">
@@ -621,6 +624,133 @@ function drawLineSeries(canvas, series, opts) {
   ctx.restore();
 }
 
+function drawBarChart(canvas, categories, values, opts = {}) {
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  const styles = getComputedStyle(document.documentElement);
+  const gridColor = styles.getPropertyValue("--line-soft").trim() || "#333";
+  const barColor = opts.color || styles.getPropertyValue("--accent").trim();
+  const textColor = styles.getPropertyValue("--text-faint").trim() || "#888";
+  const valueColor = styles.getPropertyValue("--text-hi").trim() || "#fff";
+
+  const padLeft = 26;
+  const padBottom = 22;
+  const padTop = 16;
+  const padRight = 6;
+  const plotW = w - padLeft - padRight;
+  const plotH = h - padBottom - padTop;
+  const maxV = Math.max(...values, 1);
+  const barW = plotW / categories.length;
+
+  ctx.strokeStyle = gridColor;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(padLeft, padTop);
+  ctx.lineTo(padLeft, h - padBottom);
+  ctx.lineTo(w - padRight, h - padBottom);
+  ctx.stroke();
+
+  ctx.fillStyle = barColor;
+  values.forEach((v, i) => {
+    const barH = (v / maxV) * plotH;
+    ctx.fillRect(padLeft + i * barW + 2, h - padBottom - barH, Math.max(barW - 4, 1), barH);
+  });
+
+  ctx.font = "9.5px ui-monospace, monospace";
+  ctx.fillStyle = valueColor;
+  ctx.textAlign = "center";
+  values.forEach((v, i) => {
+    const barH = (v / maxV) * plotH;
+    ctx.fillText(String(v), padLeft + i * barW + barW / 2, h - padBottom - barH - 4);
+  });
+
+  ctx.fillStyle = textColor;
+  categories.forEach((c, i) => {
+    ctx.fillText(c, padLeft + i * barW + barW / 2, h - padBottom + 12);
+  });
+}
+
+function drawRadar(canvas, categories, series, opts = {}) {
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  const styles = getComputedStyle(document.documentElement);
+  const gridColor = styles.getPropertyValue("--line-soft").trim() || "#333";
+  const textColor = styles.getPropertyValue("--text-faint").trim() || "#888";
+
+  const n = categories.length;
+  const cx = w / 2;
+  const cy = h / 2 + 4;
+  const radius = Math.min(w, h) / 2 - 30;
+  const maxV = opts.max !== undefined ? opts.max : Math.max(...series.flatMap((s) => s.values), 1);
+  const angleFor = (i) => -Math.PI / 2 + (i / n) * Math.PI * 2;
+  const pointFor = (i, v) => {
+    const r = (Math.max(v, 0) / maxV) * radius;
+    const a = angleFor(i);
+    return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+  };
+
+  ctx.strokeStyle = gridColor;
+  ctx.lineWidth = 1;
+  [0.25, 0.5, 0.75, 1].forEach((frac) => {
+    ctx.beginPath();
+    for (let i = 0; i <= n; i++) {
+      const a = angleFor(i % n);
+      const r = frac * radius;
+      const x = cx + r * Math.cos(a);
+      const y = cy + r * Math.sin(a);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  });
+
+  ctx.fillStyle = textColor;
+  ctx.font = "10px ui-monospace, monospace";
+  ctx.textAlign = "center";
+  for (let i = 0; i < n; i++) {
+    const a = angleFor(i);
+    const x2 = cx + radius * Math.cos(a);
+    const y2 = cy + radius * Math.sin(a);
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    const lx = cx + (radius + 14) * Math.cos(a);
+    const ly = cy + (radius + 14) * Math.sin(a) + 3;
+    ctx.fillText(categories[i], lx, ly);
+  }
+
+  series.forEach((s) => {
+    ctx.beginPath();
+    s.values.forEach((v, i) => {
+      const p = pointFor(i, v);
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+    ctx.closePath();
+    ctx.fillStyle = s.fill || `${s.color}26`;
+    ctx.fill();
+    ctx.setLineDash(s.dashed ? [4, 3] : []);
+    ctx.strokeStyle = s.color;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = s.color;
+    s.values.forEach((v, i) => {
+      const p = pointFor(i, v);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  });
+}
+
 function renderAgePanel(state) {
   renderNavbar("age", true);
   const p = state.params;
@@ -644,7 +774,6 @@ function renderAgePanel(state) {
 
   appBody.innerHTML = `
     <div>
-      <div class="eyebrow">Modificatori</div>
       <h1>Peso Età</h1>
       <p class="sub">Termine additivo per il valore finale: bonus per i giovani (margine di crescita in una lega pluriennale), rampa lineare che scende gradualmente a 0 — niente malus, mai negativo. Parametri modificabili, non applicati se non salvi.</p>
     </div>
@@ -767,7 +896,6 @@ function renderTaxPanel(state) {
 
   appBody.innerHTML = `
     <div>
-      <div class="eyebrow">Modificatori</div>
       <h1>Tasse svincolo</h1>
       <p class="sub">Tassa sul valore (motivo estero/decisionale) + tassa plusvalenza + recupero minusvalenza. Anteprima "netto" qui sotto assume sempre svincolo decisionale (motivo più comune) sul costo pagato realmente.</p>
     </div>
@@ -830,7 +958,6 @@ function renderFormulaPanel(state) {
 
   appBody.innerHTML = `
     <div>
-      <div class="eyebrow">Valori Svincolo</div>
       <h1>Normalizzazione FVM / QUOT</h1>
       <p class="sub">FVM e QUOT vengono compressi e tagliati separatamente, poi mescolati con φ. Regola e guarda l'istogramma cambiare.</p>
     </div>
@@ -973,6 +1100,60 @@ const ROLE_LABELS = {
 };
 const ROLE_ORDER = ["Por", "Dc", "B", "Ds", "Dd", "M", "C", "E", "W", "T", "Pc", "A"];
 
+// Port 1:1 di src.engine.roleDemand (FantaManager/+src/+engine/roleDemand.m,
+// buildMantraModules): gli 11 moduli tattici standard del sistema Mantra usati
+// dal motore MATLAB per la domanda di ruolo. Ogni modulo ha 11 slot; uno slot con
+// piu' token (es. ["Dc","B"]) ammette qualunque giocatore con quel ruolo Mantra.
+// Difesa: Dc=centrale, Dd=terzino destro, Ds=terzino sinistro, B=braccetto (centrale
+// nella difesa a 3). Centrocampo: M=mediano, C=centrale, E=esterno, W=ala, T=trequartista.
+// Attacco: Pc=punta centrale, A=attaccante.
+const MANTRA_MODULES = [
+  { name: "3-4-3", slots: ["Por", "Dc", "Dc", ["Dc", "B"], ["M", "C"], "C", "E", "E", ["W", "A"], ["W", "A"], ["A", "Pc"]] },
+  { name: "3-4-1-2", slots: ["Por", "Dc", "Dc", ["Dc", "B"], ["M", "C"], "C", "E", "E", "T", ["A", "Pc"], ["A", "Pc"]] },
+  { name: "3-5-2", slots: ["Por", "Dc", "Dc", ["Dc", "B"], ["M", "C"], "C", "M", "E", ["E", "W"], ["A", "Pc"], ["A", "Pc"]] },
+  { name: "3-4-2-1", slots: ["Por", "Dc", "Dc", ["Dc", "B"], ["M", "C"], "M", "E", ["E", "W"], "T", ["T", "A"], ["A", "Pc"]] },
+  { name: "3-5-1-1", slots: ["Por", "Dc", "Dc", ["Dc", "B"], "M", "C", "M", ["E", "W"], ["E", "W"], ["T", "A"], ["A", "Pc"]] },
+  { name: "4-3-3", slots: ["Por", "Dc", "Dc", "Ds", "Dd", ["M", "C"], "C", "M", ["W", "A"], ["W", "A"], ["A", "Pc"]] },
+  { name: "4-3-1-2", slots: ["Por", "Dc", "Dc", "Ds", "Dd", ["M", "C"], "C", "M", "T", ["T", "A", "Pc"], ["A", "Pc"]] },
+  { name: "4-4-2", slots: ["Por", "Dc", "Dc", "Ds", "Dd", ["M", "C"], "C", "E", ["E", "W"], ["A", "Pc"], ["A", "Pc"]] },
+  { name: "4-2-3-1", slots: ["Por", "Dc", "Dc", "Ds", "Dd", ["M", "C"], "M", "T", ["W", "T"], ["W", "A"], ["A", "Pc"]] },
+  { name: "4-4-1-1", slots: ["Por", "Dc", "Dc", "Ds", "Dd", "C", "M", ["E", "W"], ["E", "W"], ["T", "A"], ["A", "Pc"]] },
+  { name: "4-1-4-1", slots: ["Por", "Dc", "Dc", "Ds", "Dd", "M", ["C", "T"], ["E", "W"], "T", "W", ["A", "Pc"]] },
+];
+
+// Assegna la miglior formazione titolare fattibile per un modulo Mantra: gli slot piu'
+// vincolati (meno token ammessi, es. "Por" o "Dc" puro) vengono riempiti prima con
+// l'euristica "most-constrained-first" (CSP classico), col giocatore di valore piu' alto
+// tra quelli ancora liberi ed eleggibili per quello slot. Greedy, non garantito ottimo,
+// ma ogni assegnazione resta visibile in tabella (PRODUCT.md: mai solo il risultato).
+function bestXIForModule(players, mod) {
+  const slots = mod.slots.map((s, i) => ({ index: i, roles: Array.isArray(s) ? s : [s] }));
+  const order = [...slots].sort((a, b) => a.roles.length - b.roles.length || a.index - b.index);
+
+  const used = new Set();
+  const assigned = new Array(slots.length).fill(null);
+  const missingSlots = [];
+
+  for (const slot of order) {
+    const candidates = players
+      .filter((p) => !used.has(p.nome) && p.mantraRoles.some((r) => slot.roles.includes(r)))
+      .sort((a, b) => b.lordo - a.lordo);
+    if (candidates.length === 0) {
+      missingSlots.push(slot.roles.join("/"));
+      continue;
+    }
+    used.add(candidates[0].nome);
+    assigned[slot.index] = candidates[0];
+  }
+
+  const starters = assigned.filter(Boolean);
+  const totalValue = starters.reduce((s, p) => s + p.lordo, 0);
+  const bench = players.filter((p) => !used.has(p.nome));
+  const relevantRoles = [...new Set(slots.flatMap((s) => s.roles))];
+
+  return { formation: mod.name, feasible: missingSlots.length === 0, missingSlots, slots, assigned, totalValue, bench, relevantRoles };
+}
+
 function roleBarRow(label, value, max, color, valueLabel) {
   const pct = value <= 0 ? 0 : Math.max(2, (value / max) * 100);
   return `
@@ -997,7 +1178,6 @@ function renderRolesPanel(state) {
 
   appBody.innerHTML = `
     <div>
-      <div class="eyebrow">Modificatori</div>
       <h1>Modificatori Ruolo</h1>
       <p class="sub">Modificatore manuale per ruolo (es. 1.20 = +20%): entra diretto in "mod" nel Valore finale del giocatore (S×(1+mod+duttilita+eta)), NON moltiplicato per la scarsita' (ScarNorm/Consigliato qui sotto sono solo un riferimento, mai applicati in automatico). Valore 1.0 = nessun effetto — decidi tu.</p>
     </div>
@@ -1098,16 +1278,17 @@ function renderPlayerList(state) {
   renderNavbar("players", true);
   const scoresById = new Map(state.scores.map((s) => [s.id, s]));
   const rows = state.players.map((p) => {
-    const s = scoresById.get(p.id) || { fScore: null, qScore: null, score: null, mod: null, flex: null, etaWeight: null, assembleWeight: null, creditoStimato: null };
+    const s = scoresById.get(p.id) || { fScore: null, qScore: null, score: null, mod: null, flex: null, etaWeight: null, assembleWeight: null, creditoStimato: null, incassoNettoDecisionale: null };
     return {
       id: p.id,
       nome: p.nome,
       ruolo: p.roleMantra,
-      squadra: p.team || "—",
+      fantaSquadra: p.team || "",
       owned: p.owned,
       fuoriLista: p.fuoriLista,
       fvm: p.fvm,
       quot: p.quot,
+      costo: p.costo,
       fScore: s.fScore,
       qScore: s.qScore,
       score: s.score,
@@ -1115,30 +1296,47 @@ function renderPlayerList(state) {
       duttilita: s.flex !== null && s.flex !== undefined ? s.flex - 1 : null,
       etaWeight: s.etaWeight,
       assembleWeight: s.assembleWeight,
-      creditoStimato: s.creditoStimato,
+      // Sia il credito stimato (lordo) che il netto svincolo hanno senso solo per chi e'
+      // posseduto -- sono valori derivati dal tetto crediti della lega assegnato a chi la
+      // rosa ce l'ha gia'; un libero non ha nessun valore "preso dai crediti massimi"
+      // (2026-08-05, richiesta esplicita del proprietario). Restano null -> "--" in tabella.
+      creditoStimato: p.owned ? s.creditoStimato : null,
+      nettoSvincolo: p.owned ? s.incassoNettoDecisionale : null,
     };
   });
 
   let sortKey = "creditoStimato";
   let sortDir = -1;
   let filterText = "";
-  let filterRole = "";
-  let filterOwnedOnly = false;
+  const filterRoles = new Set();
+  let filterSquadra = "";
+  let filterOwned = ""; // "" = tutti, "owned" = solo posseduti, "free" = solo svincolati/liberi
 
   const roles = Array.from(new Set(rows.flatMap((r) => (r.ruolo || "").split("/")).filter(Boolean))).sort();
+  const squadre = Array.from(new Set(rows.map((r) => r.fantaSquadra).filter(Boolean))).sort();
 
   function renderTable() {
     const filtered = rows.filter((r) => {
       if (filterText && !r.nome.toLowerCase().includes(filterText.toLowerCase())) return false;
-      if (filterRole && !(r.ruolo || "").split("/").includes(filterRole)) return false;
-      if (filterOwnedOnly && !r.owned) return false;
+      if (filterRoles.size > 0 && !(r.ruolo || "").split("/").some((tok) => filterRoles.has(tok))) return false;
+      if (filterSquadra && r.fantaSquadra !== filterSquadra) return false;
+      if (filterOwned === "owned" && !r.owned) return false;
+      if (filterOwned === "free" && r.owned) return false;
       return true;
     });
     filtered.sort((a, b) => {
       const av = a[sortKey];
       const bv = b[sortKey];
-      if (av === null || av === undefined) return 1;
-      if (bv === null || bv === undefined) return -1;
+      const aNull = av === null || av === undefined;
+      const bNull = bv === null || bv === undefined;
+      // Entrambi senza valore (liberi, es. su creditoStimato/nettoSvincolo): raggruppali
+      // comunque per FVM decrescente, altrimenti finiscono in ordine casuale e i migliori
+      // liberi (es. attaccanti forti appena aggiunti) si perdono in mezzo a centinaia di
+      // righe (2026-08-05: "Ramos/Kolo Muani sono spariti" -- non erano spariti, solo
+      // impossibili da trovare scorrendo per via di un comparator rotto).
+      if (aNull && bNull) return b.fvm - a.fvm;
+      if (aNull) return 1;
+      if (bNull) return -1;
       if (typeof av === "string") return sortDir * av.localeCompare(bv);
       return sortDir * (av - bv);
     });
@@ -1150,7 +1348,8 @@ function renderPlayerList(state) {
         (r) => `<tr>
           <td class="team-name">${r.nome}${r.fuoriLista ? ' <span class="pill pill-out">fuori lista</span>' : ""}</td>
           <td>${r.ruolo}</td>
-          <td>${r.squadra}</td>
+          <td>${r.fantaSquadra || "—"}</td>
+          <td class="num mono">${r.costo ?? "—"}</td>
           <td class="num mono">${r.fvm}</td>
           <td class="num mono">${r.quot}</td>
           <td class="num mono">${fmt(r.fScore, 3)}</td>
@@ -1161,6 +1360,7 @@ function renderPlayerList(state) {
           <td class="num mono">${fmt(r.etaWeight, 3)}</td>
           <td class="num mono" style="font-weight:700; color:var(--gold);">${fmt(r.assembleWeight, 3)}</td>
           <td class="num mono" style="font-weight:700; color:var(--accent);">${fmt(r.creditoStimato, 1)}</td>
+          <td class="num mono" style="font-weight:700; color:var(--gold);">${r.nettoSvincolo === null || r.nettoSvincolo === undefined ? "—" : fmt(r.nettoSvincolo, 1)}</td>
         </tr>`
       )
       .join("");
@@ -1170,7 +1370,8 @@ function renderPlayerList(state) {
   const columns = [
     { key: "nome", label: "Nome" },
     { key: "ruolo", label: "Ruolo" },
-    { key: "squadra", label: "Squadra" },
+    { key: "fantaSquadra", label: "FantaSquadra" },
+    { key: "costo", label: "Costo", num: true },
     { key: "fvm", label: "FVM", num: true },
     { key: "quot", label: "QUOT", num: true },
     { key: "fScore", label: "F_score", num: true },
@@ -1180,16 +1381,21 @@ function renderPlayerList(state) {
     { key: "duttilita", label: "duttilità", num: true },
     { key: "etaWeight", label: "età", num: true },
     { key: "assembleWeight", label: "Valore", num: true },
-    { key: "creditoStimato", label: "Crediti", num: true },
+    { key: "creditoStimato", label: "Credito stimato (lordo)", num: true },
+    { key: "nettoSvincolo", label: "Netto svincolo", num: true },
   ];
 
   const ap = state.params;
 
   appBody.innerHTML = `
-    <div>
-      <div class="eyebrow">Valori Svincolo</div>
-      <h1>Lista giocatori</h1>
-      <p class="sub" id="player-count"></p>
+    <div class="toolbar">
+      <div class="left">
+        <h1>Lista giocatori</h1>
+        <p class="sub" id="player-count"></p>
+      </div>
+      <div class="right">
+        <a class="btn btn-primary" href="/api/export-listone" download>Esporta listone xlsx</a>
+      </div>
     </div>
 
     <div class="panel">
@@ -1221,19 +1427,31 @@ function renderPlayerList(state) {
         <label for="player-search">Cerca nome</label>
         <input class="input" id="player-search" placeholder="es. Martinez" />
       </div>
-      <div class="field" style="max-width:220px;">
-        <label for="player-role-filter">Ruolo</label>
-        <select class="input" id="player-role-filter">
-          <option value="">Tutti</option>
-          ${roles.map((r) => `<option value="${r}">${r}</option>`).join("")}
+      <div class="field" style="max-width:260px;">
+        <label for="player-squadra-filter">FantaSquadra</label>
+        <select class="input" id="player-squadra-filter">
+          <option value="">Tutte</option>
+          ${squadre.map((s) => `<option value="${s}">${s}</option>`).join("")}
         </select>
       </div>
-      <div class="field" style="max-width:220px; justify-content:flex-end;">
-        <label for="player-owned-filter">&nbsp;</label>
-        <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; padding:10px 0;">
-          <input type="checkbox" id="player-owned-filter" style="width:16px; height:16px;" />
-          Solo posseduti (squadre fanta)
-        </label>
+      <div class="field" style="max-width:220px;">
+        <label for="player-owned-filter">Possesso</label>
+        <select class="input" id="player-owned-filter">
+          <option value="">Tutti</option>
+          <option value="owned">Solo posseduti</option>
+          <option value="free">Solo svincolati (liberi)</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label>Ruolo (multi-selezione)</label>
+      <div id="player-role-filter" style="display:flex; flex-wrap:wrap; gap:6px; padding:8px 0;">
+        ${roles
+          .map(
+            (r) =>
+              `<button type="button" class="btn btn-ghost role-pill" data-role="${r}" style="padding:4px 10px; font-size:12px;">${r}</button>`
+          )
+          .join("")}
       </div>
     </div>
     <div class="panel" style="padding:0; overflow:hidden;">
@@ -1279,12 +1497,25 @@ function renderPlayerList(state) {
     filterText = e.target.value;
     renderTable();
   });
-  document.getElementById("player-role-filter").addEventListener("change", (e) => {
-    filterRole = e.target.value;
+  document.querySelectorAll(".role-pill").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const role = btn.dataset.role;
+      if (filterRoles.has(role)) {
+        filterRoles.delete(role);
+        btn.classList.remove("btn-primary");
+      } else {
+        filterRoles.add(role);
+        btn.classList.add("btn-primary");
+      }
+      renderTable();
+    });
+  });
+  document.getElementById("player-squadra-filter").addEventListener("change", (e) => {
+    filterSquadra = e.target.value;
     renderTable();
   });
   document.getElementById("player-owned-filter").addEventListener("change", (e) => {
-    filterOwnedOnly = e.target.checked;
+    filterOwned = e.target.value;
     renderTable();
   });
   document.querySelectorAll("[data-sort-key]").forEach((th) => {
@@ -1299,6 +1530,193 @@ function renderPlayerList(state) {
     });
   });
   document.getElementById("players-back-btn").addEventListener("click", () => loadAndRender());
+}
+
+function renderTeamPanel(state, teamName) {
+  renderNavbar("dashboard", true);
+  const team = state.teams.table.find((t) => t.name === teamName);
+  if (!team) {
+    renderError(`Squadra "${teamName}" non trovata.`);
+    return;
+  }
+
+  const scoresById = new Map(state.scores.map((s) => [s.id, s]));
+  const roster = state.players
+    .filter((p) => p.owned && p.team === teamName)
+    .map((p) => {
+      const s = scoresById.get(p.id) || {};
+      const lordo = s.creditoStimato || 0;
+      const netto = s.incassoNettoDecisionale || 0;
+      const costo = p.costo || 0;
+      const mantraRoles = (p.roleMantra || "").split("/").filter(Boolean);
+      return { nome: p.nome, ruolo: p.roleMantra || "", mantraRoles, costo, lordo, netto, delta: netto - costo };
+    })
+    .sort((a, b) => b.lordo - a.lordo);
+
+  const formationResults = MANTRA_MODULES.map((m) => bestXIForModule(roster, m)).sort((a, b) => {
+    if (a.feasible !== b.feasible) return a.feasible ? -1 : 1;
+    return (b.totalValue || 0) - (a.totalValue || 0);
+  });
+  const bestFormation = formationResults.find((f) => f.feasible) || null;
+
+  const countByRole = ROLE_ORDER.map((r) => roster.filter((p) => p.ruolo.split("/").includes(r)).length);
+
+  const avgByRole = (players) =>
+    ROLE_ORDER.map((r) => {
+      const vals = players.filter((p) => p.ruolo.split("/").includes(r)).map((p) => p.lordo);
+      return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : 0;
+    });
+
+  const allOwned = state.players
+    .filter((p) => p.owned)
+    .map((p) => ({ ruolo: p.roleMantra || "", lordo: (scoresById.get(p.id) || {}).creditoStimato || 0 }));
+
+  const teamByRole = avgByRole(roster);
+  const leagueByRole = avgByRole(allOwned);
+
+  const banca = isOverrideSet(team.bankOverride) ? team.bankOverride : team.creditiIniziali;
+  const lordoTot = roster.reduce((s, p) => s + p.lordo, 0);
+  const nettoTot = roster.reduce((s, p) => s + p.netto, 0);
+
+  const styles = getComputedStyle(document.documentElement);
+  const accentColor = styles.getPropertyValue("--accent").trim();
+  const goldColor = styles.getPropertyValue("--gold").trim();
+
+  appBody.innerHTML = `
+    <div class="toolbar">
+      <div class="left">
+        <h1 style="font-size:22px;">${team.name}</h1>
+        <span class="hint">${roster.length} giocatori in rosa</span>
+      </div>
+      <div class="right">
+        <button class="btn btn-ghost btn-sm" id="team-back-btn">← Torna alla dashboard</button>
+      </div>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat"><span class="k">Banca</span><span class="v">${banca}</span></div>
+      <div class="stat"><span class="k">Bonus/Malus</span><span class="v ${team.bonusMalusSum >= 0 ? "accent" : "gold"}">${team.bonusMalusSum}</span></div>
+      <div class="stat"><span class="k">Valore rosa (lordo)</span><span class="v gold">${Math.ceil(lordoTot)}</span></div>
+      <div class="stat"><span class="k">Netto se svincolasse tutta</span><span class="v accent">${Math.ceil(nettoTot)}</span></div>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-head"><h2>Giocatori per ruolo</h2><span class="hint">Rosa attuale</span></div>
+        <canvas id="team-role-bar" width="480" height="230" style="width:100%; height:230px;"></canvas>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2>Profilo squadra</h2><span class="hint">Valore medio per ruolo</span></div>
+        <div class="legend-row sub">
+          <span><i class="dot" style="background:${accentColor};"></i> ${team.name}</span>
+          <span><i class="dot" style="background:${goldColor};"></i> Media lega</span>
+        </div>
+        <canvas id="team-radar" width="480" height="300" style="width:100%; height:300px;"></canvas>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Moduli fattibili</h2>
+        <span class="hint">Formazione titolare che massimizza il valore stimato, coprendo tutti i ruoli richiesti</span></div>
+      ${roster.length === 0 ? '<p class="sub">Nessun giocatore posseduto.</p>' : `
+      <div class="table-wrap"><table>
+        <thead><tr><th>Modulo</th><th>Stato</th><th class="num">Valore titolari</th></tr></thead>
+        <tbody>${formationResults
+          .map((f, i) => {
+            const isBest = bestFormation && f.formation === bestFormation.formation && i === 0;
+            const statusCell = f.feasible
+              ? `<span class="pill ${isBest ? "pill-plus" : "pill-upd"}">${isBest ? "consigliato" : "fattibile"}</span>`
+              : `<span class="pill pill-minus">mancano: ${f.missingSlots.join(", ")}</span>`;
+            return `<tr>
+              <td class="team-name mono">${f.formation}</td>
+              <td>${statusCell}</td>
+              <td class="num mono" style="font-weight:${isBest ? 700 : 400};">${f.feasible ? f.totalValue.toFixed(1) : "—"}</td>
+            </tr>`;
+          })
+          .join("")}</tbody>
+      </table></div>`}
+    </div>
+
+    ${bestFormation ? `
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-head"><h2>Titolari — modulo ${bestFormation.formation}</h2>
+          <span class="hint">Valore ${bestFormation.totalValue.toFixed(1)}</span></div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Ruolo</th><th>Nome</th><th class="num">Valore</th></tr></thead>
+          <tbody>${bestFormation.slots
+            .map((slot, i) => {
+              const p = bestFormation.assigned[i];
+              return `<tr>
+                <td class="mono sub">${slot.roles.join("/")}</td>
+                <td class="team-name">${p ? p.nome : "—"}</td>
+                <td class="num mono">${p ? p.lordo.toFixed(1) : "—"}</td>
+              </tr>`;
+            })
+            .join("")}</tbody>
+        </table></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2>Analisi cambi</h2>
+          <span class="hint">Panchina disponibile col modulo ${bestFormation.formation}, per profondita' di ruolo</span></div>
+        ${bestFormation.relevantRoles
+          .map((r) => {
+            const players = bestFormation.bench.filter((p) => p.mantraRoles.includes(r)).sort((a, b) => b.lordo - a.lordo);
+            const pillClass = players.length === 0 ? "pill-minus" : players.length === 1 ? "pill-upd" : "pill-plus";
+            return `
+            <div class="field-row" style="align-items:baseline; margin-bottom:6px;">
+              <span class="mono sub" style="min-width:2.5rem;">${r}</span>
+              <span class="pill ${pillClass}">${players.length} in panchina</span>
+              <span class="sub" style="flex:2; min-width:0;">${players.map((p) => p.nome).join(", ") || "nessun cambio disponibile — rischio in caso di infortunio/squalifica"}</span>
+            </div>`;
+          })
+          .join("")}
+      </div>
+    </div>` : `
+    <div class="panel">
+      <p class="sub">Nessun modulo Mantra e' coperto dalla rosa attuale (mancano giocatori in uno o piu' ruoli).</p>
+    </div>`}
+
+    <div class="panel">
+      <div class="panel-head"><h2>Studio svincoli — rosa ${team.name}</h2>
+        <span class="hint">Costo pagato vs valore lordo attuale vs netto svincolo decisionale</span></div>
+      ${
+        roster.length === 0
+          ? '<p class="sub">Nessun giocatore posseduto.</p>'
+          : `<div class="table-wrap"><table>
+        <thead><tr><th>Nome</th><th>Ruolo</th><th class="num">Costo</th><th class="num">Lordo</th><th class="num">Netto</th><th class="num">Plus/Minus</th></tr></thead>
+        <tbody>${roster
+          .map(
+            (p) => `<tr>
+            <td class="team-name">${p.nome}</td>
+            <td class="mono sub">${p.ruolo}</td>
+            <td class="num mono sub">${p.costo}</td>
+            <td class="num mono">${p.lordo.toFixed(1)}</td>
+            <td class="num mono" style="font-weight:700;">${p.netto.toFixed(1)}</td>
+            <td class="num mono"><span class="pill ${p.delta >= 0 ? "pill-plus" : "pill-minus"}">${p.delta >= 0 ? "+" : ""}${p.delta.toFixed(1)}</span></td>
+          </tr>`
+          )
+          .join("")}</tbody>
+      </table></div>`
+      }
+    </div>
+
+    <div class="footer-bar"><div></div><div class="footer-actions"><button class="btn btn-ghost" id="team-back-btn-2">← Torna alla dashboard</button></div></div>
+  `;
+
+  drawBarChart(document.getElementById("team-role-bar"), ROLE_ORDER, countByRole, { color: accentColor });
+  drawRadar(
+    document.getElementById("team-radar"),
+    ROLE_ORDER,
+    [
+      { values: teamByRole, color: accentColor },
+      { values: leagueByRole, color: goldColor, dashed: true },
+    ],
+    {}
+  );
+
+  document.getElementById("team-back-btn").addEventListener("click", () => loadAndRender());
+  document.getElementById("team-back-btn-2").addEventListener("click", () => loadAndRender());
 }
 
 async function renderLeagueBar() {
@@ -1345,12 +1763,12 @@ async function renderLeagueBar() {
 
 function renderNavbar(active, hasLeague) {
   const items = [
-    { key: "dashboard", label: "Dashboard", fn: () => loadAndRender() },
-    { key: "players", label: "☰ Lista giocatori", fn: () => fetchState().then(renderPlayerList) },
-    { key: "formula", label: "φ Formula valori", fn: () => fetchState().then(renderFormulaPanel) },
-    { key: "roles", label: "⚽ Ruoli", fn: () => fetchState().then(renderRolesPanel) },
-    { key: "age", label: "🎂 Età", fn: () => fetchState().then(renderAgePanel) },
-    { key: "tax", label: "💸 Tasse", fn: () => fetchState().then(renderTaxPanel) },
+    { key: "dashboard", label: `${icon("grid", 14)}Dashboard`, fn: () => loadAndRender() },
+    { key: "players", label: `${icon("list", 14)}Lista giocatori`, fn: () => fetchState().then(renderPlayerList) },
+    { key: "formula", label: "&phi; Formula valori", fn: () => fetchState().then(renderFormulaPanel) },
+    { key: "roles", label: `${icon("users", 14)}Ruoli`, fn: () => fetchState().then(renderRolesPanel) },
+    { key: "age", label: `${icon("calendar", 14)}Età`, fn: () => fetchState().then(renderAgePanel) },
+    { key: "tax", label: `${icon("percent", 14)}Tasse`, fn: () => fetchState().then(renderTaxPanel) },
   ];
   const nav = document.getElementById("navbar");
   if (!hasLeague) {

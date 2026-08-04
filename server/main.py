@@ -1,3 +1,4 @@
+import io
 import json
 import os
 import re
@@ -6,8 +7,9 @@ import uuid
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from openpyxl import Workbook
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 CONFIG_DIR = Path(os.environ.get("FANTAMANAGER_CONFIG_DIR", str(BASE_DIR / "config")))
@@ -139,6 +141,52 @@ def get_action(action_id: str):
         if entry["id"] == action_id:
             return entry
     raise HTTPException(status_code=404, detail="Azione non trovata.")
+
+
+@app.get("/api/export-listone")
+def export_listone():
+    state_json, _ = _active_paths()
+    if not state_json.exists():
+        raise HTTPException(status_code=404, detail="Nessuna lega attiva con dati caricati.")
+    state = json.loads(state_json.read_text(encoding="utf-8"))
+
+    scores_by_id = {s["id"]: s for s in state.get("scores", [])}
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Lista calciatori"
+    headers = [
+        "#", "Nome", "Fuori lista", "Ruolo", "Ruolo Mantra", "FantaSquadra", "Costo",
+        "FVM", "QUOT", "Credito stimato (lordo)", "Netto svincolo",
+    ]
+    ws.append(headers)
+
+    for p in state.get("players", []):
+        owned = bool(p.get("owned"))
+        s = scores_by_id.get(p.get("id"), {})
+        ws.append([
+            p.get("id"),
+            p.get("nome"),
+            "*" if p.get("fuoriLista") else "",
+            p.get("roleClassic"),
+            p.get("roleMantra"),
+            p.get("team") if owned else "",
+            p.get("costo") if owned else None,
+            p.get("fvm"),
+            p.get("quot"),
+            s.get("creditoStimato") if owned else None,
+            s.get("incassoNettoDecisionale") if owned else None,
+        ])
+
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    filename = f"listone_{_active_slug()}.xlsx"
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @app.post("/api/upload-csv")
