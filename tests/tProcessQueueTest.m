@@ -62,6 +62,31 @@ classdef tProcessQueueTest < matlab.unittest.TestCase
             testCase.verifyEqual(state.scores.score, state.scores.fScore, 'AbsTol', 1e-12);
         end
 
+        function setRoleParamsEntryRecomputesRoleFactor(testCase)
+            work = testCase.createWorkDir();
+            csvFile = fullfile(fileparts(mfilename('fullpath')), 'fixtures', 'listone_min.csv');
+            createQueue = {struct('id', "r1", 'type', "createLeague", 'status', "pending", ...
+                'payload', struct('csvPath', string(csvFile), 'epsilon', 0.05, ...
+                    'credits', [struct('teamName', "LAMINCHIADURA", 'value', 500); ...
+                                struct('teamName', "Eintracht Piangoforte", 'value', 480)]))};
+            testCase.writeQueue(work.queuePath, createQueue);
+            src.app.processQueue(work.queuePath, work.statePath, work.jsonPath);
+
+            before = src.state.LeagueState.loadState(work.statePath).scores.pesoRuolo;
+
+            paramsQueue = {struct('id', "r2", 'type', "setRoleParams", 'status', "pending", ...
+                'payload', struct('qw', 1, 'mixOwned', 1, 'eta', 1, 'nmax', 3, 'rho', 0.4))};
+            testCase.writeQueue(work.queuePath, paramsQueue);
+            src.app.processQueue(work.queuePath, work.statePath, work.jsonPath);
+
+            resultQueue = jsondecode(fileread(work.queuePath));
+            testCase.verifyEqual(string(resultQueue.status), "applied");
+
+            state = src.state.LeagueState.loadState(work.statePath);
+            testCase.verifyEqual(state.params.rho, 0.4);
+            testCase.verifyFalse(isequal(before, state.scores.pesoRuolo));
+        end
+
         function missingQueueFileStillExportsCurrentState(testCase)
             work = testCase.createWorkDir();
             src.app.processQueue(work.queuePath, work.statePath, work.jsonPath);

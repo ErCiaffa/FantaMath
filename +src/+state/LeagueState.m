@@ -67,13 +67,62 @@ classdef LeagueState
             score = src.engine.mixScores(fScore, qScore, p.phi);
 
             roleParams = struct('qw', p.qw, 'mix_owned', p.mixOwned, 'eta', p.eta, ...
-                'Sq', max(height(state.teams.table), 1), 'nmax', p.nmax, 'beta', p.beta, ...
+                'Sq', max(height(state.teams.table), 1), 'nmax', p.nmax, ...
+                'duttilita2', p.duttilita2, 'duttilita3', p.duttilita3, ...
                 'rho', p.rho, 'roleOverride', p.roleOverride);
             scarcity = src.engine.roleScarcity(state.players, score, roleParams);
             rf = src.engine.roleFactor(state.players.roleTokens, scarcity, roleParams);
 
+            ageParams = struct('etaFloor', p.etaFloor, 'etaZero', p.etaZero, 'etaBonusMax', p.etaBonusMax);
+            etaWeight = src.engine.ageWeight(state.players.age, ageParams);
+
+            mod = src.engine.roleMod(state.players.roleTokens, p.roleOverride);
+            duttilita = rf.Flex - 1.0;
+            assembleWeight = src.engine.assembleWeight(score, mod, duttilita, etaWeight);
+
+            totalBudget = sum(state.teams.table.creditiIniziali) * (1 + state.epsilon);
+            taxParams = struct('taxEstero', p.taxEstero, 'taxDecisionale', p.taxDecisionale, ...
+                'taxPlusvalenza', p.taxPlusvalenza, 'taxMinusvalenza', p.taxMinusvalenza, 'taxFee', p.taxFee);
+            costo = state.players.costo;
+            costo(isnan(costo)) = 0;
+            owned = state.players.owned;
+
+            if isfinite(totalBudget) && totalBudget > 0 && any(owned)
+                shape = max(0, assembleWeight + p.auctionOffsetC) .^ p.auctionExpK;
+                netSumFor = @(s) sum(arrayfun(@(i) src.engine.releaseTax( ...
+                    max(p.auctionFloor, s*shape(i)), costo(i), false, taxParams).IncassoNetto, find(owned)));
+                % Scale-factor tale che il NETTO (dopo tasse, motivo decisionale) sommi
+                % esatto a totalBudget -- 2026-08-04, richiesta esplicita del proprietario:
+                % "se tutti svincolano tutti abbiamo W*", non il lordo. Bisezione: netSumFor
+                % e' monotona crescente in s (piu' lordo -> piu' netto), un solo giro basta.
+                lo = 0; hi = 10;
+                while netSumFor(hi) < totalBudget && hi < 1e6
+                    hi = hi * 4;
+                end
+                for iter = 1:40
+                    mid = (lo + hi) / 2;
+                    if netSumFor(mid) < totalBudget
+                        lo = mid;
+                    else
+                        hi = mid;
+                    end
+                end
+                scaleFactor = (lo + hi) / 2;
+                creditoStimato = max(p.auctionFloor, scaleFactor * shape);
+            else
+                creditoStimato = zeros(n, 1);
+            end
+
+            incassoNettoDecisionale = zeros(n, 1);
+            for i = 1:n
+                out = src.engine.releaseTax(creditoStimato(i), costo(i), false, taxParams);
+                incassoNettoDecisionale(i) = out.IncassoNetto;
+            end
+
             state.scores = table(state.players.id, fScore, qScore, score, rf.RoleFactor, rf.Flex, rf.PesoRuolo, ...
-                'VariableNames', {'id', 'fScore', 'qScore', 'score', 'roleFactor', 'flex', 'pesoRuolo'});
+                etaWeight, mod, assembleWeight, creditoStimato, incassoNettoDecisionale, ...
+                'VariableNames', {'id', 'fScore', 'qScore', 'score', 'roleFactor', 'flex', 'pesoRuolo', ...
+                'etaWeight', 'mod', 'assembleWeight', 'creditoStimato', 'incassoNettoDecisionale'});
             state.roleSuggestion = computeRoleSuggestion(state.players, scarcity);
         end
 
@@ -98,22 +147,95 @@ classdef LeagueState
             state = src.state.LeagueState.recomputeScores(state);
         end
 
-        function state = setRoleParams(state, qw, mixOwned, eta, nmax, beta, rho)
+        function state = setRoleParams(state, qw, mixOwned, eta, nmax, rho)
             arguments
                 state struct
                 qw (1,1) double {mustBeNonnegative}
                 mixOwned (1,1) double {mustBeInRange(mixOwned, 0, 1)}
                 eta (1,1) double {mustBePositive}
                 nmax (1,1) double {mustBePositive, mustBeInteger}
-                beta (1,1) double {mustBeNonnegative}
                 rho (1,1) double {mustBePositive}
             end
             state.params.qw = qw;
             state.params.mixOwned = mixOwned;
             state.params.eta = eta;
             state.params.nmax = nmax;
-            state.params.beta = beta;
             state.params.rho = rho;
+            state = src.state.LeagueState.recomputeScores(state);
+        end
+
+        function state = setDuttilita(state, duttilita2, duttilita3)
+            % duttilita2/duttilita3: bonus (0-1, es. 0.03 = +3%) applicato a Flex per un
+            % giocatore con esattamente 2 ruoli / con nmax o piu' ruoli (vedi roleFactor.m).
+            % Parametri modificabili -- 2026-08-03: valori scelti dal proprietario lega
+            % (3%/5%), non fissi, editabili se cambia idea.
+            arguments
+                state struct
+                duttilita2 (1,1) double {mustBeNonnegative}
+                duttilita3 (1,1) double {mustBeNonnegative}
+            end
+            state.params.duttilita2 = duttilita2;
+            state.params.duttilita3 = duttilita3;
+            state = src.state.LeagueState.recomputeScores(state);
+        end
+
+        function state = setAuctionParams(state, offsetC, expK, floorCredito)
+            % Conversione finale assembleWeight -> crediti (2026-08-04, vedi auctionPrice.m):
+            % offsetC (default 0.52), expK (default 4.5), floorCredito (default 1.0). Tarati
+            % sui dati reali della lega per portare il top a 100-150 crediti senza schiacciare
+            % meta' roster nella stessa fascia bassa (vedi docs/decisioni-e-logica.md).
+            arguments
+                state struct
+                offsetC (1,1) double {mustBeNonnegative}
+                expK (1,1) double {mustBePositive}
+                floorCredito (1,1) double {mustBeNonnegative}
+            end
+            state.params.auctionOffsetC = offsetC;
+            state.params.auctionExpK = expK;
+            state.params.auctionFloor = floorCredito;
+            state = src.state.LeagueState.recomputeScores(state);
+        end
+
+        function state = setTaxParams(state, taxEstero, taxDecisionale, taxPlusvalenza, taxMinusvalenza, taxFee)
+            % Tassazione svincolo (2026-08-04, vedi releaseTax.m). Default: estero=0,
+            % decisionale=0.15, plusvalenza=0.10, minusvalenza(recupero)=0.15, fee=0 --
+            % valori scelti dal proprietario lega, non tarati sui dati, modificabili.
+            arguments
+                state struct
+                taxEstero (1,1) double {mustBeNonnegative}
+                taxDecisionale (1,1) double {mustBeNonnegative}
+                taxPlusvalenza (1,1) double {mustBeNonnegative}
+                taxMinusvalenza (1,1) double {mustBeNonnegative}
+                taxFee (1,1) double {mustBeNonnegative}
+            end
+            state.params.taxEstero = taxEstero;
+            state.params.taxDecisionale = taxDecisionale;
+            state.params.taxPlusvalenza = taxPlusvalenza;
+            state.params.taxMinusvalenza = taxMinusvalenza;
+            state.params.taxFee = taxFee;
+            state = src.state.LeagueState.recomputeScores(state);
+        end
+
+        function state = setEtaParams(state, etaFloor, etaZero, etaBonusMax)
+            % Rampa lineare bonus giovani, nessun malus veterani (2026-08-03, sostituisce lo
+            % schema a soglie 23/31 + step fissi): vedi ageWeight.m per la formula esatta.
+            % etaFloor (default 15, eta' minima Serie A): bonus massimo per eta'<=etaFloor.
+            % etaZero (default 38): eta' a cui il bonus arriva a 0 e ci resta (mai negativo).
+            % etaBonusMax (default 0.10 = 10%): bonus a etaFloor, decresce linearmente fino
+            % a 0 a etaZero.
+            arguments
+                state struct
+                etaFloor (1,1) double {mustBePositive}
+                etaZero (1,1) double {mustBePositive}
+                etaBonusMax (1,1) double {mustBeNonnegative}
+            end
+            if etaFloor >= etaZero
+                error('FantaManager:formula:invalidAgeThresholds', ...
+                    'etaFloor (%.1f) deve essere minore di etaZero (%.1f).', etaFloor, etaZero);
+            end
+            state.params.etaFloor = etaFloor;
+            state.params.etaZero = etaZero;
+            state.params.etaBonusMax = etaBonusMax;
             state = src.state.LeagueState.recomputeScores(state);
         end
 
@@ -264,7 +386,10 @@ end
 
 function p = defaultFormulaParams()
     p = struct('phi', 0.5, 'alphaF', 0.0005, 'alphaQ', 0.0005, 'pLow', 0, 'pHigh', 1, ...
-        'qw', 1, 'mixOwned', 1, 'eta', 1, 'nmax', 3, 'beta', 0.2, 'rho', 1, ...
+        'qw', 1, 'mixOwned', 1, 'eta', 1, 'nmax', 3, 'duttilita2', 0.03, 'duttilita3', 0.05, 'rho', 1, ...
+        'etaFloor', 15, 'etaZero', 38, 'etaBonusMax', 0.10, ...
+        'auctionOffsetC', 0.52, 'auctionExpK', 4.5, 'auctionFloor', 1.0, ...
+        'taxEstero', 0, 'taxDecisionale', 0.15, 'taxPlusvalenza', 0.10, 'taxMinusvalenza', 0.15, 'taxFee', 0, ...
         'roleOverride', defaultRoleOverride());
 end
 
@@ -355,9 +480,10 @@ function s = computeRoleSuggestion(players, scarcity)
 end
 
 function t = emptyScoresTable()
-    t = table('Size', [0 7], ...
-        'VariableTypes', {'double','double','double','double','double','double','double'}, ...
-        'VariableNames', {'id', 'fScore', 'qScore', 'score', 'roleFactor', 'flex', 'pesoRuolo'});
+    t = table('Size', [0 12], ...
+        'VariableTypes', repmat({'double'}, 1, 12), ...
+        'VariableNames', {'id', 'fScore', 'qScore', 'score', 'roleFactor', 'flex', 'pesoRuolo', ...
+            'etaWeight', 'mod', 'assembleWeight', 'creditoStimato', 'incassoNettoDecisionale'});
 end
 
 function t = emptyTeamsTable()

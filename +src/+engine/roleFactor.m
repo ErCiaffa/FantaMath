@@ -3,8 +3,12 @@ function rf = roleFactor(roleTokens, scarcity, params)
 %
 % rf = roleFactor(roleTokens, scarcity, params) computes, for each player i:
 %   RoleFactor_i = max over r in roleTokens{i} of ( scarcity.ScarNorm(r) * params.roleOverride.(r) )
-%   nRoli_i      = min(numel(roleTokens{i}), params.nmax)                    [assumption A9]
-%   Flex_i       = 1 + params.beta * log(1 + nRoli_i) / log(1 + params.nmax)
+%   nRoli_i      = numel(roleTokens{i})
+%   Flex_i       = 1                          if nRoli_i <= 1
+%                = 1 + params.duttilita2       if 1 < nRoli_i < params.nmax
+%                = 1 + params.duttilita3       if nRoli_i >= params.nmax
+%     (2026-08-03: direct lookup table, editable params, replaced the earlier log-based
+%     formula -- which wrongly gave every single-role player a nonzero Flex bonus)
 %   PesoRuolo_i  = RoleFactor_i .^ params.rho .* Flex_i
 %
 % The per-role override multiplies scarcity.ScarNorm(r) BEFORE the MAX is taken (assumption
@@ -61,8 +65,14 @@ function rf = roleFactor(roleTokens, scarcity, params)
 
         RoleFactor(i) = best;
 
-        nRoli = min(numel(tokens), params.nmax);
-        Flex(i) = 1 + params.beta * log(1 + nRoli) / log(1 + params.nmax);
+        nRoli = numel(tokens);
+        if nRoli <= 1
+            Flex(i) = 1.0;
+        elseif nRoli < params.nmax
+            Flex(i) = 1.0 + params.duttilita2;
+        else
+            Flex(i) = 1.0 + params.duttilita3;
+        end
     end
 
     if any(badPlayers)

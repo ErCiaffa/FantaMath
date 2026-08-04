@@ -119,6 +119,26 @@ function state = applyEntry(state, entry)
         case "setRoleOverride"
             state = src.state.LeagueState.setRoleOverride(state, entry.payload.roleOverride);
 
+        case "setRoleParams"
+            state = src.state.LeagueState.setRoleParams(state, entry.payload.qw, entry.payload.mixOwned, ...
+                entry.payload.eta, entry.payload.nmax, entry.payload.rho);
+
+        case "setDuttilita"
+            state = src.state.LeagueState.setDuttilita(state, entry.payload.duttilita2, entry.payload.duttilita3);
+
+        case "setEtaParams"
+            state = src.state.LeagueState.setEtaParams(state, entry.payload.etaFloor, entry.payload.etaZero, ...
+                entry.payload.etaBonusMax);
+
+        case "setAuctionParams"
+            state = src.state.LeagueState.setAuctionParams(state, entry.payload.offsetC, entry.payload.expK, ...
+                entry.payload.floorCredito);
+
+        case "setTaxParams"
+            state = src.state.LeagueState.setTaxParams(state, entry.payload.taxEstero, ...
+                entry.payload.taxDecisionale, entry.payload.taxPlusvalenza, entry.payload.taxMinusvalenza, ...
+                entry.payload.taxFee);
+
         otherwise
             error('FantaManager:queue:unknownType', 'Tipo azione sconosciuto: "%s".', entry.type);
     end

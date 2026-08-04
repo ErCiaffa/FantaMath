@@ -217,5 +217,127 @@ questo limite di stabilità esplicitamente accettato, non ignorato.
   Pagina "Ruoli" estesa con tabella completa (posseduti/liberi/FVM/gap%/ScarNorm) e due
   grafici a barre (disponibilità per ruolo, gap% per ruolo) per decidere con i dati davanti,
   non alla cieca.
+- **2026-08-03 (bug fix + correzione di rotta)**: trovato bug pre-esistente (non di questa
+  sessione): l'azione coda `setRoleParams` (controlla `rho`/`qw`/`eta`/`nmax`/`beta`) non era
+  mai stata collegata in `processQueue.m` — solo `setRoleOverride` lo era. Ogni tentativo di
+  cambiare `rho` da remoto/web falliva silenziosamente ("Tipo azione sconosciuto"), motivo
+  per cui `rho` è rimasto a 1 dall'inizio nonostante l'HANDOFF dicesse di abbassarlo.
+  Aggiunto il case mancante, testato (`tProcessQueueTest`). **Nessun valore applicato**:
+  `rho` resta 1, `roleOverride` tutti 1.0 — il proprietario ha corretto un tentativo di
+  applicare in automatico i valori "Consigliato" (gap%) come modificatore reale: quei
+  numeri sono **solo indicativi**, il modificatore lo decide e digita sempre lui a mano,
+  mai auto-applicato da Claude.
+- **2026-08-03 (formula assembleWeight, prima parte)**: deciso `valore = S × (1 + mod +
+  duttilità + età + ...)` — additivo puro, non `(1+mod+duttilità) × (1+età)`. Motivo:
+  con l'additivo il tetto massimo teorico è sempre la somma dei tetti singoli (prevedibile,
+  facile da spiegare), col moltiplicativo ogni bonus amplifica gli altri e il massimo reale
+  cresce ad ogni nuovo termine aggiunto (stesso tipo di rischio di "ribaltamento" già visto
+  con `rho=1`). `mod` = il modificatore che il proprietario scrive a mano nella pagina Ruoli
+  (`roleOverride - 1`, quindi 0 se override=1.00, +0.20 se override=1.20) — **non
+  moltiplicato per ScarNorm**, coerente con la correzione precedente (scarsità solo
+  indicativa). `floorValue` (prossimo step dopo età) probabilmente NON entra in questa
+  somma: è un minimo assoluto, va applicato come clamp finale dopo, non come termine
+  percentuale — da confermare quando ci si arriva.
+- **2026-08-03 (bug fix Flex + parametri duttilità)**: la vecchia `Flex = 1 + beta ×
+  log(1+nRoli)/log(1+nmax)` (beta=0.2, nmax=3) dava già +10% a **chi ha un solo ruolo**
+  (bug, doveva essere 0%). Sostituita con tabella diretta a parametri modificabili: 1
+  ruolo → Flex=1.00, 2 ruoli → `1+duttilita2` (default 0.03), ≥nmax ruoli → `1+duttilita3`
+  (default 0.05). Nuovo setter `LeagueState.setDuttilita` + azione coda `setDuttilita`.
+  Il vecchio `beta` resta nello stato salvato di legiche pre-esistenti ma non è più letto
+  da nessuna formula (harmless leftover, non pulito per non toccare `.mat` già salvati).
+- **2026-08-03 (peso età, `ageWeight`)**: prima versione a step fissi (soglie 23/31,
+  bonus/malus 5%/5%, ripresi dal vecchio FantaMath) **sostituita** su richiesta esplicita
+  del proprietario con una rampa lineare, solo bonus giovani, mai malus/negativo:
+  `bonus = etaBonusMax` per età ≤ `etaFloor` (15, età minima Serie A — non ha senso premiare
+  ancora di più sotto quella soglia), scende linearmente a 0 a `etaZero` (38), resta a 0
+  sopra. Default: `etaFloor=15, etaZero=38, etaBonusMax=0.10`. Nuova colonna
+  `state.scores.etaWeight`, nuovo motore `+src/+engine/ageWeight.m`, setter
+  `LeagueState.setEtaParams` (arity cambiata, non più 4 parametri soglie ma 3: floor/zero/
+  bonusMax), azione coda `setEtaParams` aggiornata di conseguenza. Pagina "Età" (navbar)
+  aggiunta con grafico a serie (linea, non barre — dati reali FVM medio posseduti/liberi per
+  età) e soglie marcate, per studiare la curva prima di scegliere i parametri — nessun
+  valore applicato in automatico, sempre a scelta manuale del proprietario.
+- **2026-08-03/04 (analisi storica, non applicata)**: analizzato un export storico
+  (`FantaExport_04022026.xlsx`, 318 giocatori) di una vecchia lega dove lo svincolo era
+  stato accettato come corretto. Regressione: `Svincolo ≈ 0.35 + 0.341×FVM + 1.145×Quot`
+  (lineare diretto su FVM/QUOT grezzi, non normalizzati/compressi) spiega già il 94.9%
+  della varianza. Aggiungendo una **minusvalenza** (confermata dal proprietario: se il
+  costo pagato all'asta supera il valore stimato dalle statistiche, recupera il ~15% della
+  differenza: `svincolo_finale = svincolo_stat + 0.15×max(0, costo-svincolo_stat)`) il fit
+  sale a R²=0.977, quasi esatto anche su outlier come Dybala (svincolo reale 39, stimato
+  solo-stat 26.2, con minusvalenza 37.1). Il vecchio sistema era quindi molto più semplice
+  dello stack attuale (S/roleFactor/duttilità/età/esponente k). **Decisione: tenere lo
+  stack attuale così com'è**, non sostituirlo col modello lineare né aggiungere la
+  minusvalenza per ora — analisi tenuta come riferimento se in futuro i valori finali
+  sembrano fuori scala rispetto allo storico accettato dalla lega.
+- **2026-08-04 (assembleWeight costruito per davvero)**: fino a qui `S×(1+mod+dutt+eta)`
+  esisteva solo in script Python fuori da MATLAB — la Lista Giocatori nell'app mostrava
+  ancora `RoleFactor`/`PesoRuolo` (vecchia pipeline moltiplicativa, `rho=1`, scarsità sempre
+  nel calcolo), causa di confusione: Kalulu (difensore, ruolo scarso) restava in cima anche
+  con `override=1` perché quella pipeline non era mai stata spenta. Costruito per davvero:
+  nuovo `src/engine/roleMod.m` (mod diretto da `roleOverride`, MAX tra i ruoli del
+  giocatore, **non** moltiplicato per ScarNorm) e `src/engine/assembleWeight.m`
+  (`S.*(1+mod+duttilita+eta)`, additivo puro). Nuove colonne `state.scores.mod` e
+  `state.scores.assembleWeight`. RoleFactor/PesoRuolo **non rimossi** (restano per
+  retrocompatibilità e per calcolare ScarNorm/Consigliato nella pagina Ruoli) ma la Lista
+  Giocatori ora mostra ed ordina di default su `assembleWeight`, non più su `pesoRuolo`.
+  Verificato: Martinez L. assembleWeight=1.035, Kalulu=0.669 — ordine corretto.
+- **2026-08-04 (conversione finale in crediti, `auctionPrice`)**: testate e scartate
+  sigmoide (schiaccia troppo la cima, errore 12× peggiore della potenza sui percentili
+  storici) e distribuzione gaussiana (matematicamente incompatibile: con media fissa =
+  budget/N, un top di 90-130 manda 25-33% del roster sotto zero prima del floor, sforando il
+  budget del 20-46%). FVM/QUOT grezzi verificati log-normali/power-law (skewness log quasi
+  zero, corr(log rank, log valore) ≈ -0.88/-0.81) — la potenza non è arbitraria, ricostruisce
+  la forma naturale che la normalizzazione percentile aveva compresso via. Un esponente
+  puro (`assembleWeight^k`) crea però un problema nuovo: per portare il top a 100-150 serve
+  k alto (2.6-3.3), che schiaccia 53-92 giocatori "reali ma mediocri" (non i 7 veri-zero)
+  nella stessa fascia bassa. Risolto con un **offset prima della potenza**:
+  `credito = (assembleWeight + offsetC)^expK`, riscalato al budget lega (`sum(creditiIniziali)
+  × (1+epsilon)`, calcolato solo sui posseduti), floor finale come clamp di sicurezza.
+  Grid-search sui dati reali: **offsetC=0.52, expK=4.5, floor=1** porta il top a ~100.8 e
+  dimezza l'ammassamento in fondo (nessuna fascia da 5 crediti sopra 84 giocatori, contro
+  144 del tentativo precedente). Implementato in `src/engine/auctionPrice.m`, nuova colonna
+  `state.scores.creditoStimato`, setter `LeagueState.setAuctionParams`, azione coda
+  `setAuctionParams`. Pannello parametri (offsetC/expK/floor) aggiunto in cima alla Lista
+  Giocatori, che ora ordina di default su `creditoStimato`. Verificato in produzione:
+  Martinez L.=100.8, somma posseduti=5728.9 (budget 5727).
+
+- **2026-08-04 (tasse svincolo)**: trovato precedente reale in un altro branch mai
+  merge-ato (`raw_data/FantaMath`, fase "tassazione-svincolo-e-export"): `releaseTax.m`
+  con `TassaValore` (aliquota su tutto il valore, diversa per motivo estero/decisionale) +
+  `TassaPlusvalenza` (separata, solo sul guadagno) — struttura ripresa. **Nessun recupero
+  minusvalenza** in quel codice originale (esplicitamente escluso); aggiunto qui su
+  richiesta esplicita del proprietario. Valori scelti (non tarati sui dati, decisione
+  libera): `taxEstero=0, taxDecisionale=0.15, taxPlusvalenza=0.10,
+  taxMinusvalenza=0.15 (recupero), taxFee=0`. Nuova colonna
+  `state.scores.incassoNettoDecisionale` (anteprima assumendo sempre motivo decisionale,
+  il più comune). Implementato: `src/engine/releaseTax.m`, setter
+  `LeagueState.setTaxParams`, azione coda `setTaxParams`, pagina "Tasse" (navbar).
+  Verificato: se tutti i 313 posseduti si svincolassero ora (decisionale), lordo totale
+  5728.9 → netto 4901.8 (calo 14.4%).
+
+- **2026-08-04 (invariante W* sul netto, non sul lordo)**: correzione importante —
+  l'invariante "somma = budget lega" va sul **netto** (dopo tasse, motivo decisionale), non
+  sul lordo (`creditoStimato`). Richiesta esplicita: "se tutti svincolano tutti abbiamo
+  W* = crediti iniziali × (1+epsilon)", nonostante le tasse. `epsilon` scarterebbe (scala
+  tutto proporzionalmente, non fissa il rapporto top/resto) — motivo la doc precedente
+  raccomandava `expK`/`offsetC` per la forma, ma quei parametri da soli restano tarati sul
+  lordo, non compensano la perdita media da tassazione. Risolto con bisezione in
+  `recomputeScores`: trovo lo scale-factor `s` tale che
+  `sum(releaseTax(s×shape, costo, decisionale).IncassoNetto)` sui posseduti sia esatto a
+  `totalBudget` (funzione monotona in `s`, bisezione converge in poche decine di iterazioni).
+  Il lordo (`creditoStimato`) diventa quindi conseguenza del netto, non il contrario — sale
+  automaticamente per compensare la tassa media, invece di dover essere ritarato a mano
+  (`offsetC`/`expK` restano fissi e controllano solo la FORMA, non più la scala assoluta).
+  Verificato: budget W*=5727.0, netto totale=5727.0 esatto, lordo totale sale a 6852.5,
+  Martinez L. lordo=120.6 → netto=106.8.
+
+- **Prossima sessione (da fare)**: tuner serio per la conversione crediti — l'utente imposta
+  il "top netto" desiderato (es. 150) e il sistema calcola `auctionExpK` da solo via
+  bisezione (stesso principio già usato per l'invariante W* sul netto), invece di tarare
+  `expK` a tentativi come fatto oggi (5.5→135, 6.0→153, trovati a mano). Aggiungere anche
+  grafici seri (serie/istogrammi, non solo tabelle numeriche) su tutte le pagine con
+  parametri modificabili: Ruoli, Età, Tasse, Conversione crediti — per capire l'effetto
+  visivamente prima di salvare, non solo leggere numeri in tabella.
 
 *(continua ad ogni nuova decisione)*

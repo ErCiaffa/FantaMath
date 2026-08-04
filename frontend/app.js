@@ -511,6 +511,318 @@ function drawHistogram(canvas, values, opts) {
   return stats;
 }
 
+function drawLineSeries(canvas, series, opts) {
+  // series: [{ label, color, points: [{x, y}, ...] }, ...]
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  const styles = getComputedStyle(document.documentElement);
+  const gridColor = styles.getPropertyValue("--line-soft").trim() || "#333";
+  const textColor = styles.getPropertyValue("--text-faint").trim() || "#888";
+
+  const allX = series.flatMap((s) => s.points.map((p) => p.x));
+  const allY = series.flatMap((s) => s.points.map((p) => p.y));
+  const minX = opts.minX !== undefined ? opts.minX : Math.min(...allX);
+  const maxX = opts.maxX !== undefined ? opts.maxX : Math.max(...allX);
+  const minY = 0;
+  const maxY = opts.maxY !== undefined ? opts.maxY : Math.max(...allY, 1) * 1.08;
+
+  const padLeft = 34;
+  const padBottom = 26;
+  const padTop = 14;
+  const padRight = 8;
+  const plotW = w - padLeft - padRight;
+  const plotH = h - padBottom - padTop;
+
+  const xToPx = (x) => padLeft + ((x - minX) / (maxX - minX || 1)) * plotW;
+  const yToPx = (y) => h - padBottom - ((y - minY) / (maxY - minY || 1)) * plotH;
+
+  // gridlines (horizontal, 4 steps)
+  ctx.strokeStyle = gridColor;
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = padTop + (plotH / 4) * i;
+    ctx.beginPath();
+    ctx.moveTo(padLeft, y);
+    ctx.lineTo(w - padRight, y);
+    ctx.stroke();
+  }
+
+  // axes
+  ctx.strokeStyle = textColor;
+  ctx.beginPath();
+  ctx.moveTo(padLeft, padTop);
+  ctx.lineTo(padLeft, h - padBottom);
+  ctx.lineTo(w - padRight, h - padBottom);
+  ctx.stroke();
+
+  // vertical threshold markers
+  if (opts.markers) {
+    ctx.setLineDash([4, 3]);
+    ctx.strokeStyle = styles.getPropertyValue("--gold").trim() || "#d9a94e";
+    for (const m of opts.markers) {
+      const x = xToPx(m.x);
+      ctx.beginPath();
+      ctx.moveTo(x, padTop);
+      ctx.lineTo(x, h - padBottom);
+      ctx.stroke();
+      ctx.fillStyle = ctx.strokeStyle;
+      ctx.font = "9px ui-monospace, monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(m.label, x, padTop - 3);
+    }
+    ctx.setLineDash([]);
+  }
+
+  // y ticks
+  ctx.fillStyle = textColor;
+  ctx.font = "9px ui-monospace, monospace";
+  ctx.textAlign = "right";
+  ctx.fillText("0", padLeft - 5, h - padBottom + 3);
+  ctx.fillText(maxY.toFixed(0), padLeft - 5, padTop + 8);
+
+  // x ticks (min/max)
+  ctx.textAlign = "left";
+  ctx.fillText(String(minX), padLeft, h - padBottom + 14);
+  ctx.textAlign = "right";
+  ctx.fillText(String(maxX), w - padRight, h - padBottom + 14);
+
+  // series lines + markers
+  for (const s of series) {
+    const pts = s.points.slice().sort((a, b) => a.x - b.x);
+    ctx.strokeStyle = s.color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    pts.forEach((p, i) => {
+      const px = xToPx(p.x);
+      const py = yToPx(p.y);
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    });
+    ctx.stroke();
+    ctx.fillStyle = s.color;
+    pts.forEach((p) => {
+      ctx.beginPath();
+      ctx.arc(xToPx(p.x), yToPx(p.y), 2, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  // axis titles
+  ctx.fillStyle = textColor;
+  ctx.textAlign = "center";
+  ctx.fillText(opts.xLabel || "", padLeft + plotW / 2, h - 2);
+  ctx.save();
+  ctx.translate(9, padTop + plotH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText(opts.yLabel || "", 0, 0);
+  ctx.restore();
+}
+
+function renderAgePanel(state) {
+  renderNavbar("age", true);
+  const p = state.params;
+  const byAge = new Map();
+  for (const player of state.players) {
+    if (player.fuoriLista) continue;
+    const age = player.age;
+    if (age === null || age === undefined || Number.isNaN(age)) continue;
+    const a = Math.round(age);
+    if (!byAge.has(a)) byAge.set(a, { owned: [], free: [] });
+    (player.owned ? byAge.get(a).owned : byAge.get(a).free).push(player.fvm);
+  }
+  const ages = [...byAge.keys()].sort((x, y) => x - y);
+  const avg = (arr) => (arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : 0);
+  const rows = ages.map((a) => {
+    const b = byAge.get(a);
+    return { age: a, nOwned: b.owned.length, nFree: b.free.length, fvmOwned: avg(b.owned), fvmFree: avg(b.free) };
+  });
+
+  const styles = getComputedStyle(document.documentElement);
+
+  appBody.innerHTML = `
+    <div>
+      <div class="eyebrow">Modificatori</div>
+      <h1>Peso Età</h1>
+      <p class="sub">Termine additivo per il valore finale: bonus per i giovani (margine di crescita in una lega pluriennale), rampa lineare che scende gradualmente a 0 — niente malus, mai negativo. Parametri modificabili, non applicati se non salvi.</p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>FVM medio per eta'</h2>
+        <span class="hint">Serie posseduti (verde) / liberi (blu) — linee gialle = soglie attuali</span></div>
+      <div class="legend-row sub">
+        <span><i class="dot" style="background:var(--accent);"></i> Posseduti</span>
+        <span><i class="dot" style="background:var(--chart-blue);"></i> Liberi</span>
+      </div>
+      <canvas id="age-chart" width="960" height="220" style="width:100%; height:220px;"></canvas>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Parametri</h2>
+        <span class="hint">Rampa lineare: bonus massimo a etaFloor, scende a 0 a etaZero, mai negativo (niente malus veterani)</span></div>
+      <div class="field-row">
+        <div class="field">
+          <label for="eta-floor">etaFloor (eta' minima Serie A, bonus massimo qui e sotto)</label>
+          <input class="input mono" id="eta-floor" value="${p.etaFloor}" />
+        </div>
+        <div class="field">
+          <label for="eta-zero">etaZero (eta' a cui il bonus arriva a 0)</label>
+          <input class="input mono" id="eta-zero" value="${p.etaZero}" />
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="eta-bonus-max">Bonus massimo a etaFloor (0-1, es. 0.10 = 10%)</label>
+          <input class="input mono" id="eta-bonus-max" value="${p.etaBonusMax}" />
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Tabella per eta'</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Eta'</th><th>Poss.</th><th>Liberi</th><th>FVM poss.</th><th>FVM liberi</th></tr></thead>
+          <tbody>
+            ${rows.map((r) => `
+              <tr>
+                <td class="mono">${r.age}</td>
+                <td class="mono sub">${r.nOwned}</td>
+                <td class="mono sub">${r.nFree}</td>
+                <td class="mono sub">${r.fvmOwned.toFixed(1)}</td>
+                <td class="mono sub">${r.fvmFree.toFixed(1)}</td>
+              </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="footer-bar">
+      <div></div>
+      <div class="footer-actions">
+        <button class="btn btn-ghost" id="age-back-btn">← Torna alla dashboard</button>
+        <button class="btn btn-primary" id="age-apply-btn">Salva</button>
+      </div>
+    </div>
+    <p class="sub" id="age-status"></p>
+  `;
+
+  drawLineSeries(document.getElementById("age-chart"), [
+    { label: "Posseduti", color: styles.getPropertyValue("--accent").trim(), points: rows.map((r) => ({ x: r.age, y: r.fvmOwned })) },
+    { label: "Liberi", color: styles.getPropertyValue("--chart-blue").trim(), points: rows.map((r) => ({ x: r.age, y: r.fvmFree })) },
+  ], {
+    xLabel: "Eta'",
+    yLabel: "FVM medio",
+    markers: [
+      { x: p.etaFloor, label: `≤${p.etaFloor} bonus max` },
+      { x: p.etaZero, label: `≥${p.etaZero} bonus 0` },
+    ],
+  });
+
+  document.getElementById("age-back-btn").addEventListener("click", () => loadAndRender());
+
+  document.getElementById("age-apply-btn").addEventListener("click", async () => {
+    const statusEl = document.getElementById("age-status");
+    const etaFloor = parseFloat(document.getElementById("eta-floor").value);
+    const etaZero = parseFloat(document.getElementById("eta-zero").value);
+    const etaBonusMax = parseFloat(document.getElementById("eta-bonus-max").value);
+    if ([etaFloor, etaZero, etaBonusMax].some((v) => Number.isNaN(v))) {
+      statusEl.textContent = "Errore: valori non validi.";
+      return;
+    }
+    if (etaFloor >= etaZero) {
+      statusEl.textContent = "Errore: etaFloor deve essere minore di etaZero.";
+      return;
+    }
+    statusEl.textContent = "MATLAB sta ricalcolando i punteggi…";
+    try {
+      await postAction("setEtaParams", { etaFloor, etaZero, etaBonusMax });
+      const newState = await fetchState();
+      renderAgePanel(newState);
+    } catch (err) {
+      statusEl.textContent = `Errore: ${err.message}`;
+    }
+  });
+}
+
+function renderTaxPanel(state) {
+  renderNavbar("tax", true);
+  const p = state.params;
+  const scoresById = new Map(state.scores.map((s) => [s.id, s]));
+  const rows = state.players
+    .filter((pl) => pl.owned)
+    .map((pl) => {
+      const s = scoresById.get(pl.id) || {};
+      return {
+        nome: pl.nome, costo: pl.costo || 0,
+        lordo: s.creditoStimato || 0, netto: s.incassoNettoDecisionale || 0,
+      };
+    })
+    .sort((a, b) => b.lordo - a.lordo);
+  const lordoTot = rows.reduce((s, r) => s + r.lordo, 0);
+  const nettoTot = rows.reduce((s, r) => s + r.netto, 0);
+  const calo = lordoTot > 0 ? (1 - nettoTot / lordoTot) * 100 : 0;
+
+  appBody.innerHTML = `
+    <div>
+      <div class="eyebrow">Modificatori</div>
+      <h1>Tasse svincolo</h1>
+      <p class="sub">Tassa sul valore (motivo estero/decisionale) + tassa plusvalenza + recupero minusvalenza. Anteprima "netto" qui sotto assume sempre svincolo decisionale (motivo più comune) sul costo pagato realmente.</p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Parametri</h2></div>
+      <div class="field-row">
+        <div class="field"><label for="tax-estero">Estero (0-1)</label><input class="input mono" id="tax-estero" value="${p.taxEstero}" /></div>
+        <div class="field"><label for="tax-decisionale">Decisionale (0-1)</label><input class="input mono" id="tax-decisionale" value="${p.taxDecisionale}" /></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label for="tax-plus">Plusvalenza (0-1)</label><input class="input mono" id="tax-plus" value="${p.taxPlusvalenza}" /></div>
+        <div class="field"><label for="tax-minus">Minusvalenza recupero (0-1)</label><input class="input mono" id="tax-minus" value="${p.taxMinusvalenza}" /></div>
+        <div class="field"><label for="tax-fee">Fee fissa (crediti)</label><input class="input mono" id="tax-fee" value="${p.taxFee}" /></div>
+      </div>
+      <div class="field-row"><button class="btn btn-primary" id="tax-apply-btn">Salva</button></div>
+      <p class="sub" id="tax-status"></p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Impatto totale (se tutti svincolassero ora, decisionale)</h2></div>
+      <p class="sub mono">Lordo: ${lordoTot.toFixed(1)}  →  Netto: ${nettoTot.toFixed(1)}  (calo ${calo.toFixed(1)}%)</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Nome</th><th>Costo</th><th>Lordo</th><th>Netto</th></tr></thead>
+          <tbody>${rows.slice(0, 30).map((r) => `<tr><td>${r.nome}</td><td class="mono sub">${r.costo}</td><td class="mono sub">${r.lordo.toFixed(1)}</td><td class="mono" style="font-weight:700;">${r.netto.toFixed(1)}</td></tr>`).join("")}</tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="footer-bar"><div></div><div class="footer-actions"><button class="btn btn-ghost" id="tax-back-btn">← Torna alla dashboard</button></div></div>
+  `;
+
+  document.getElementById("tax-back-btn").addEventListener("click", () => loadAndRender());
+  document.getElementById("tax-apply-btn").addEventListener("click", async () => {
+    const statusEl = document.getElementById("tax-status");
+    const taxEstero = parseFloat(document.getElementById("tax-estero").value);
+    const taxDecisionale = parseFloat(document.getElementById("tax-decisionale").value);
+    const taxPlusvalenza = parseFloat(document.getElementById("tax-plus").value);
+    const taxMinusvalenza = parseFloat(document.getElementById("tax-minus").value);
+    const taxFee = parseFloat(document.getElementById("tax-fee").value);
+    if ([taxEstero, taxDecisionale, taxPlusvalenza, taxMinusvalenza, taxFee].some((v) => Number.isNaN(v))) {
+      statusEl.textContent = "Errore: valori non validi.";
+      return;
+    }
+    statusEl.textContent = "MATLAB sta ricalcolando…";
+    try {
+      await postAction("setTaxParams", { taxEstero, taxDecisionale, taxPlusvalenza, taxMinusvalenza, taxFee });
+      renderTaxPanel(await fetchState());
+    } catch (err) {
+      statusEl.textContent = `Errore: ${err.message}`;
+    }
+  });
+}
+
 function renderFormulaPanel(state) {
   renderNavbar("formula", true);
   const p = state.params;
@@ -687,7 +999,7 @@ function renderRolesPanel(state) {
     <div>
       <div class="eyebrow">Modificatori</div>
       <h1>Modificatori Ruolo</h1>
-      <p class="sub">Moltiplicatore manuale applicato alla scarsita' del ruolo (PesoRuolo), prima che entri nel punteggio finale del giocatore. Valore 1.0 = nessun effetto, mai applicato automaticamente — decidi tu.</p>
+      <p class="sub">Modificatore manuale per ruolo (es. 1.20 = +20%): entra diretto in "mod" nel Valore finale del giocatore (S×(1+mod+duttilita+eta)), NON moltiplicato per la scarsita' (ScarNorm/Consigliato qui sotto sono solo un riferimento, mai applicati in automatico). Valore 1.0 = nessun effetto — decidi tu.</p>
     </div>
 
     <div class="panel">
@@ -786,7 +1098,7 @@ function renderPlayerList(state) {
   renderNavbar("players", true);
   const scoresById = new Map(state.scores.map((s) => [s.id, s]));
   const rows = state.players.map((p) => {
-    const s = scoresById.get(p.id) || { fScore: null, qScore: null, score: null, roleFactor: null, pesoRuolo: null };
+    const s = scoresById.get(p.id) || { fScore: null, qScore: null, score: null, mod: null, flex: null, etaWeight: null, assembleWeight: null, creditoStimato: null };
     return {
       id: p.id,
       nome: p.nome,
@@ -799,12 +1111,15 @@ function renderPlayerList(state) {
       fScore: s.fScore,
       qScore: s.qScore,
       score: s.score,
-      roleFactor: s.roleFactor,
-      pesoRuolo: s.pesoRuolo,
+      mod: s.mod,
+      duttilita: s.flex !== null && s.flex !== undefined ? s.flex - 1 : null,
+      etaWeight: s.etaWeight,
+      assembleWeight: s.assembleWeight,
+      creditoStimato: s.creditoStimato,
     };
   });
 
-  let sortKey = "score";
+  let sortKey = "creditoStimato";
   let sortDir = -1;
   let filterText = "";
   let filterRole = "";
@@ -841,8 +1156,11 @@ function renderPlayerList(state) {
           <td class="num mono">${fmt(r.fScore, 3)}</td>
           <td class="num mono">${fmt(r.qScore, 3)}</td>
           <td class="num mono" style="font-weight:700;">${fmt(r.score, 3)}</td>
-          <td class="num mono">${fmt(r.roleFactor, 3)}</td>
-          <td class="num mono" style="font-weight:700; color:var(--gold);">${fmt(r.pesoRuolo, 3)}</td>
+          <td class="num mono">${fmt(r.mod, 3)}</td>
+          <td class="num mono">${fmt(r.duttilita, 3)}</td>
+          <td class="num mono">${fmt(r.etaWeight, 3)}</td>
+          <td class="num mono" style="font-weight:700; color:var(--gold);">${fmt(r.assembleWeight, 3)}</td>
+          <td class="num mono" style="font-weight:700; color:var(--accent);">${fmt(r.creditoStimato, 1)}</td>
         </tr>`
       )
       .join("");
@@ -858,9 +1176,14 @@ function renderPlayerList(state) {
     { key: "fScore", label: "F_score", num: true },
     { key: "qScore", label: "Q_score", num: true },
     { key: "score", label: "S", num: true },
-    { key: "roleFactor", label: "RoleFactor", num: true },
-    { key: "pesoRuolo", label: "PesoRuolo", num: true },
+    { key: "mod", label: "mod", num: true },
+    { key: "duttilita", label: "duttilità", num: true },
+    { key: "etaWeight", label: "età", num: true },
+    { key: "assembleWeight", label: "Valore", num: true },
+    { key: "creditoStimato", label: "Crediti", num: true },
   ];
+
+  const ap = state.params;
 
   appBody.innerHTML = `
     <div>
@@ -868,6 +1191,31 @@ function renderPlayerList(state) {
       <h1>Lista giocatori</h1>
       <p class="sub" id="player-count"></p>
     </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Conversione in crediti</h2>
+        <span class="hint">Crediti = (Valore + offsetC)^expK, riscalato al budget lega, floor minimo</span></div>
+      <div class="field-row">
+        <div class="field">
+          <label for="auction-offsetc">offsetC</label>
+          <input class="input mono" id="auction-offsetc" value="${ap.auctionOffsetC}" />
+        </div>
+        <div class="field">
+          <label for="auction-expk">expK</label>
+          <input class="input mono" id="auction-expk" value="${ap.auctionExpK}" />
+        </div>
+        <div class="field">
+          <label for="auction-floor">floor (crediti minimi)</label>
+          <input class="input mono" id="auction-floor" value="${ap.auctionFloor}" />
+        </div>
+        <div class="field" style="justify-content:flex-end;">
+          <label>&nbsp;</label>
+          <button class="btn btn-primary" id="auction-apply-btn">Salva</button>
+        </div>
+      </div>
+      <p class="sub" id="auction-status"></p>
+    </div>
+
     <div class="field-row">
       <div class="field">
         <label for="player-search">Cerca nome</label>
@@ -907,6 +1255,25 @@ function renderPlayerList(state) {
   `;
 
   renderTable();
+
+  document.getElementById("auction-apply-btn").addEventListener("click", async () => {
+    const statusEl = document.getElementById("auction-status");
+    const offsetC = parseFloat(document.getElementById("auction-offsetc").value);
+    const expK = parseFloat(document.getElementById("auction-expk").value);
+    const floorCredito = parseFloat(document.getElementById("auction-floor").value);
+    if ([offsetC, expK, floorCredito].some((v) => Number.isNaN(v))) {
+      statusEl.textContent = "Errore: valori non validi.";
+      return;
+    }
+    statusEl.textContent = "MATLAB sta ricalcolando i punteggi…";
+    try {
+      await postAction("setAuctionParams", { offsetC, expK, floorCredito });
+      const newState = await fetchState();
+      renderPlayerList(newState);
+    } catch (err) {
+      statusEl.textContent = `Errore: ${err.message}`;
+    }
+  });
 
   document.getElementById("player-search").addEventListener("input", (e) => {
     filterText = e.target.value;
@@ -982,6 +1349,8 @@ function renderNavbar(active, hasLeague) {
     { key: "players", label: "☰ Lista giocatori", fn: () => fetchState().then(renderPlayerList) },
     { key: "formula", label: "φ Formula valori", fn: () => fetchState().then(renderFormulaPanel) },
     { key: "roles", label: "⚽ Ruoli", fn: () => fetchState().then(renderRolesPanel) },
+    { key: "age", label: "🎂 Età", fn: () => fetchState().then(renderAgePanel) },
+    { key: "tax", label: "💸 Tasse", fn: () => fetchState().then(renderTaxPanel) },
   ];
   const nav = document.getElementById("navbar");
   if (!hasLeague) {

@@ -6,7 +6,8 @@ classdef tRoleParamsTest < matlab.unittest.TestCase
             testCase.verifyEqual(state.params.mixOwned, 1);
             testCase.verifyEqual(state.params.eta, 1);
             testCase.verifyEqual(state.params.nmax, 3);
-            testCase.verifyEqual(state.params.beta, 0.2);
+            testCase.verifyEqual(state.params.duttilita2, 0.03);
+            testCase.verifyEqual(state.params.duttilita3, 0.05);
             testCase.verifyEqual(state.params.rho, 1);
             testCase.verifyTrue(isstruct(state.params.roleOverride));
         end
@@ -27,13 +28,37 @@ classdef tRoleParamsTest < matlab.unittest.TestCase
             state = src.state.LeagueState.createFromCsv(string(csvFile), creditiMap, 0.05);
 
             before = state.scores.pesoRuolo;
-            state = src.state.LeagueState.setRoleParams(state, 2, 1, 2, 3, 0.5, 1);
+            state = src.state.LeagueState.setRoleParams(state, 2, 1, 2, 3, 1);
 
             testCase.verifyEqual(state.params.qw, 2);
             testCase.verifyEqual(state.params.eta, 2);
             testCase.verifyEqual(state.params.nmax, 3);
-            testCase.verifyEqual(state.params.beta, 0.5);
             testCase.verifyFalse(isequal(before, state.scores.pesoRuolo));
+        end
+
+        function setDuttilitaRecomputesFlexAndPersists(testCase)
+            csvFile = fullfile(fileparts(mfilename('fullpath')), 'fixtures', 'listone_min.csv');
+            creditiMap = containers.Map({'LAMINCHIADURA', 'Eintracht Piangoforte'}, {500, 480});
+            state = src.state.LeagueState.createFromCsv(string(csvFile), creditiMap, 0.05);
+
+            before = state.scores.pesoRuolo;
+            state = src.state.LeagueState.setDuttilita(state, 0.10, 0.15);
+
+            testCase.verifyEqual(state.params.duttilita2, 0.10);
+            testCase.verifyEqual(state.params.duttilita3, 0.15);
+            testCase.verifyFalse(isequal(before, state.scores.pesoRuolo));
+        end
+
+        function flexIsExactlyOneForSingleRolePlayers(testCase)
+            % 2026-08-03 bug fix: the old log-based Flex gave every single-role player a
+            % nonzero bonus (~1.10 with the old defaults). Flex must be exactly 1.0 for them.
+            csvFile = fullfile(fileparts(mfilename('fullpath')), 'fixtures', 'listone_min.csv');
+            creditiMap = containers.Map({'LAMINCHIADURA', 'Eintracht Piangoforte'}, {500, 480});
+            state = src.state.LeagueState.createFromCsv(string(csvFile), creditiMap, 0.05);
+
+            singleRoleMask = cellfun(@numel, state.players.roleTokens) == 1;
+            testCase.assumeTrue(any(singleRoleMask));
+            testCase.verifyEqual(state.scores.flex(singleRoleMask), ones(nnz(singleRoleMask), 1));
         end
 
         function setRoleOverrideRecomputesPesoRuoloAndPersists(testCase)
@@ -82,7 +107,7 @@ classdef tRoleParamsTest < matlab.unittest.TestCase
             % a DIFFERENT roleSuggestion -- proving the suggestion is computed live from the
             % current scarcity, not a fixed snapshot baked in ahead of time.
             before = state.roleSuggestion;
-            state2 = src.state.LeagueState.setRoleParams(state, 5, 1, 1, 3, 0.2, 1);
+            state2 = src.state.LeagueState.setRoleParams(state, 5, 1, 1, 3, 1);
             testCase.verifyFalse(isequaln(before, state2.roleSuggestion));
         end
 
