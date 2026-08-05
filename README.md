@@ -152,5 +152,3 @@ cd server && python -m pytest tests/ -q
 | [`docs/FORMULE.md`](docs/FORMULE.md) | Modello di valutazione completo: ogni formula, parametro e razionale |
 | [`docs/normalizzazione-fvm-quot.md`](docs/normalizzazione-fvm-quot.md) | Analisi dettagliata della normalizzazione FVM/QUOT |
 | [`docs/decisioni-e-logica.md`](docs/decisioni-e-logica.md) | Log cronologico delle decisioni di design prese durante lo sviluppo |
-| [`PRODUCT.md`](PRODUCT.md) | Obiettivo del prodotto, utenti, vincoli |
-| [`HANDOFF.md`](HANDOFF.md) | Stato del lavoro in corso, bug noti |
