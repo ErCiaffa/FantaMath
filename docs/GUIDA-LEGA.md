@@ -1,8 +1,10 @@
 # Come funzionano i numeri di FantaManager — guida per la lega
 
-Questo documento spiega **senza formule** come nascono i valori che vedi in FantaManager
-(valore giocatore, prezzo svincolo, crediti in asta). Se hai dubbi su "perché il mio
-giocatore vale X e non Y", la risposta è quasi sempre qui dentro.
+Questo documento spiega **con formule ed esempi reali** (niente linguaggio tecnico da
+programmatore) come nascono i valori che vedi in FantaManager (valore giocatore, prezzo
+svincolo, crediti in asta). Se hai dubbi su "perché il mio giocatore vale X e non Y", la
+risposta è quasi sempre qui dentro — ogni formula è seguita dalla spiegazione di ogni
+simbolo e da un esempio con numeri veri.
 
 Per i dettagli tecnici/matematici precisi: `FORMULE.md`. Per la storia di *perché* ogni
 scelta è stata presa (incluse le alternative scartate): `decisioni-e-logica.md`.
@@ -37,30 +39,56 @@ protegge i giocatori di alto profilo da cali eccessivi.
 
 Da questi due dati ufficiali calcoliamo un **valore assoluto 0-1** per ogni giocatore — un
 indicatore di **quanto quel giocatore dovrebbe rendere**, non una misura assoluta di
-qualità in sé, ma una stima costruita incrociando FVM e quotazione.
+qualità in sé, ma una stima costruita incrociando FVM e quotazione, ciascuno prima
+riportato su una scala 0-1 propria (F_score da FVM, Q_score da quotazione):
 
-Poi questo valore viene **aggiustato** con dei bonus (mai malus, tranne uno) per tenere
-conto di cose che FVM/quotazione da soli non catturano bene per la nostra lega specifica:
+```
+S  =  φ · F  +  (1 − φ) · Q,      con φ = 0,40
+```
+
+dove **F** è l'FVM normalizzato 0-1, **Q** la quotazione normalizzata 0-1, e **φ** (si
+legge "fi") è il peso del mix: φ=0,40 significa 40% FVM + 60% quotazione. Se φ fosse 1
+conterebbe solo l'FVM, se fosse 0 solo la quotazione — è un cursore tra i due estremi, oggi
+fermo al 40%. La quotazione pesa di più (60%) perché è il segnale più stabile, meno
+soggetto ai cambi rapidi giorno per giorno che invece muovono l'FVM.
+
+Poi questo valore **S** viene **aggiustato** con tre bonus (mai malus, tranne uno) per
+tenere conto di cose che FVM/quotazione da soli non catturano bene per la nostra lega
+specifica, e si combinano così:
+
+```
+Valore finale = S × (1 + mod + duttilità + eta)
+```
+
+dove `mod` = modificatore ruolo, `duttilità` = bonus multi-ruolo, `eta` = bonus età — i tre
+termini **si sommano tra loro dentro la parentesi**, poi il totale **moltiplica** S (non si
+sommano direttamente a S). Motivo di questa struttura: ogni bonus è pensato come "percentuale
+in più sul valore che il giocatore già ha", non come punti fissi aggiunti — un top player con
+S alto guadagna di più in valore assoluto dallo stesso bonus percentuale di un giocatore
+mediocre, correttamente (il 10% di un valore alto è più del 10% di uno basso).
 
 | Bonus | Per chi | Quanto vale (di default) |
 |---|---|---|
-| **Modificatore ruolo** | Ogni ruolo Mantra ha il suo, calibrato sullo studio dei dati reali di lega (vedi sezione dedicata) | Da 0% a +15% a seconda del ruolo |
-| **Duttilità** | Chi copre 2+ ruoli Mantra | +3% (2 ruoli) o +5% (3+ ruoli) |
-| **Età** | Under 15-38 anni, scala linearmente | Fino a +10% per i più giovani |
+| **Modificatore ruolo** (`mod`) | Ogni ruolo Mantra ha il suo, calibrato sullo studio dei dati reali di lega (vedi sezione dedicata) | Da 0% a +15% a seconda del ruolo |
+| **Duttilità** (`duttilità`) | Chi copre 2+ ruoli Mantra | +3% (2 ruoli) o +5% (3+ ruoli) |
+| **Età** (`eta`) | Under 15-38 anni, scala linearmente | Fino a +10% per i più giovani |
 
-Questi tre bonus **si sommano** al punteggio base (non si moltiplicano tra loro) — scelta
-voluta: così il tetto massimo che un giocatore può raggiungere resta prevedibile, invece
-di esplodere se capitano più bonus insieme.
+I tre bonus **si sommano tra loro** dentro la parentesi (non si moltiplicano l'uno con
+l'altro) — scelta voluta: così il tetto massimo che un giocatore può raggiungere resta
+prevedibile (somma dei tetti singoli), invece di esplodere se capitano più bonus insieme.
 
 **Esempio reale (Kean, oggi in lega):**
 
 ```
-Valore assoluto (da FVM+quotazione):  0,85
-+ modificatore ruolo Pc:              +0,11
-+ duttilità (copre 1 solo ruolo):     +0,00
-+ bonus età:                          +0,06
-──────────────────────────────────────────
-Valore finale:                        0,99   (su una scala 0-1, quasi il massimo)
+S (valore assoluto, 40% FVM + 60% quotazione):  0,85
+
+mod (modificatore ruolo Pc):        0,11
+duttilità (copre 1 solo ruolo):     0,00
+eta (bonus età):                    0,06
+────────────────────────────────────────
+1 + mod + duttilità + eta:          1,17
+
+Valore finale = S × 1,17 = 0,85 × 1,17 = 0,99
 ```
 
 ---
@@ -123,8 +151,19 @@ sale.
 
 Regola nascosta ma importante: **se in questo momento TUTTI i giocatori posseduti di
 TUTTE le squadre venissero svincolati insieme**, la somma di tutti i netti deve tornare
-esatta ai crediti totali ancora "in gioco" nella lega (crediti iniziali di tutte le
-squadre, più un piccolo margine, meno quello che è già fermo in banca come contante).
+esatta ai crediti totali ancora "in gioco" nella lega:
+
+```
+Σ nettoSvincolo(g)  =  Σ creditiIniziali(squadra) · (1 + ε)  −  Σ residuo(squadra)
+ g posseduto           su tutte le squadre                     su tutte le squadre
+```
+
+Il simbolo **Σ** (sigma maiuscola) vuol dire semplicemente "somma di": la prima sommatoria
+somma il netto svincolo di *ogni singolo giocatore posseduto* in lega, uno per uno; le altre
+due sommano crediti iniziali e residuo di *ogni squadra*, una per una. **ε** (epsilon) è un
+piccolo margine impostato una volta al setup lega. **residuo** = banca attuale + bonus/malus
+già dati a quella squadra (sempre sottratto: è contante già fermo, non legato a nessun
+giocatore — vedi sotto perché).
 
 Perché importa: significa che i valori non sono arbitrari o gonfiati — sono sempre
 ancorati alla reale disponibilità economica della lega. Se un proprietario riceve un bonus
@@ -179,7 +218,7 @@ prima o dopo.
 
 | Cosa | Valore oggi |
 |---|---|
-| Peso FVM vs quotazione nel punteggio base | 40% FVM / 60% quotazione |
+| Peso FVM vs quotazione nel valore assoluto S (φ) | 40% FVM / 60% quotazione |
 | Bonus età massimo | +10%, per chi ha 15 anni o meno |
 | Età da cui il bonus si azzera | 38 anni |
 | Bonus duttilità (2 ruoli / 3+ ruoli) | +3% / +5% |
