@@ -340,4 +340,70 @@ questo limite di stabilità esplicitamente accettato, non ignorato.
   parametri modificabili: Ruoli, Età, Tasse, Conversione crediti — per capire l'effetto
   visivamente prima di salvare, non solo leggere numeri in tabella.
 
+- **2026-08-05 (Lista giocatori: fix filtro multi-ruolo, filtro fuori-lista/estero,
+  crediti arrotondati)**: tre richieste esplicite del proprietario.
+  1. Bug filtro multi-ruolo "non si vede": le pill ruolo usavano `classList.add("btn-primary")`
+     senza togliere `btn-ghost` — a parità di specificità CSS `.btn-ghost` è dichiarata dopo
+     `.btn-primary` in `styles.css` e vinceva sempre, quindi il click non cambiava aspetto
+     (il filtro funzionava, ma sembrava non fare nulla). Fix: swap esplicito delle classi
+     in `app.js` (`renderPlayerList`).
+  2. Filtro "Possesso" aveva solo Tutti/Solo posseduti/Solo svincolati, e "svincolati"
+     includeva anche i fuori-lista (owned=false li esclude ma non era un'opzione dedicata).
+     Aggiunta quarta opzione "Fuori lista / estero" (`filterOwned === "fuorilista"`),
+     "Solo svincolati" ora esclude esplicitamente i fuori-lista.
+  3. Tutti i valori in crediti (costo, credito stimato/lordo, netto svincolo, plus/minus,
+     valore titolari formazione) mostrati **interi, arrotondati per eccesso** (`Math.ceil`
+     lato frontend, `math.ceil` lato export xlsx) — mai più decimali su numeri in crediti.
+     Nuovo helper `fmtCredit()` in `app.js`. I punteggi non-crediti (Valore/assembleWeight,
+     mod, duttilità, età, F/Q score) restano a 3 decimali, non toccati.
+
+- **2026-08-05 (export xlsx: solo Ruolo Mantra + Netto svincolo + Valore assoluto)**:
+  tolte dal file `/api/export-listone` le colonne Ruolo (classico) e Credito stimato
+  (lordo) — richiesta esplicita "solo ruolo mantra e valore svincolo (netto) senza dire
+  il lordo". Aggiunta colonna "Valore" = `assembleWeight` (lo stesso "valore assoluto"
+  mostrato in Lista giocatori), su richiesta esplicita per avere un riferimento di valore
+  intrinseco del giocatore indipendente dal netto post-tasse. Netto svincolo arrotondato
+  per eccesso nel file. Implementato in `server/main.py` (`export_listone`).
+
+- **2026-08-05 (scraper mercato in scripts/, dati in docs/data/)**: richiesta esplicita
+  del proprietario di aggregare dati di mercato da fantacalcio.it (quotazioni/FVM
+  ufficiali + commento PRO/CONTRO per giocatore), FantaGoat (performance/titolarità/
+  continuità + multi-stagione) e FantaLab (guida asta, rosa Hoffenaimer sincronizzata
+  con rating) per preparare l'asta di riparazione. Decisioni tecniche:
+  - fantacalcio.it è server-rendered e pubblico (nessun login richiesto) — scraper con
+    `requests`+`BeautifulSoup`, niente browser headless. Verificato: 494 giocatori
+    dal listone ufficiale 2026/27 in un'unica richiesta (i dati sono negli attributi
+    `data-filter-*`/`data-col-key` delle righe tabella, non serve JS).
+  - FantaGoat/FantaLab sono SPA con login — **niente automazione del login**: lo
+    script `scrape_login.py` apre un browser vero, il proprietario fa login a mano,
+    lo script salva solo cookie/localStorage in `config/scrape_sessions/*.json`
+    (cartella già in `.gitignore`, mai vista da git). Motivo: entrare credenziali
+    per conto dell'utente è vietato dalle regole di sicurezza dell'agente, a
+    prescindere da chi lo chiede.
+  - `scripts/scrape_fantagoat.py` e `scrape_fantalab.py` sono scritti sulla struttura
+    DOM osservata a mano durante l'analisi rosa Hoffenaimer, ma **non testati
+    end-to-end** (serve la sessione reale per farlo): possibile che qualche
+    selettore vada corretto alla prima esecuzione vera.
+  - Output sempre in `docs/data/*.csv`, mai nel repo committato senza controllo
+    (dati di terzi, verificare licenza/ToS prima di condividere pubblicamente).
+
+- **2026-08-05 (W\* sottrae la banca residua, non solo crediti iniziali)**: il proprietario
+  ha notato che dando un bonus di 850 crediti a una squadra, il netto svincolo dei
+  giocatori non si muoveva — la formula ignorava banca/bonus/malus del tutto
+  (`totalBudget = Σ creditiIniziali · (1+epsilon)`, fisso). Bug concettuale: un bonus
+  inietta ricchezza nel `residuo` di quella squadra ma il pool usato per scalare il valore
+  netto di TUTTI i giocatori di lega restava invariato — la stessa ricchezza finiva
+  contata due volte (banca + valore giocatori) senza che nessuno dei due si riducesse.
+  Corretto: `totalBudget = Σ creditiIniziali · (1+epsilon) − Σ residuo(squadra)`, dove
+  `residuo` (banca + bonus/malus, sempre additivo, §"Banca residua" sopra) è ora sottratto
+  dal pool. Riusa `bankResiduoVector` già esistente, nessuna nuova funzione.
+  **Limite noto, accettato esplicitamente dal proprietario**: la banca è tracciata a mano
+  (`bankOverride`), non derivata automaticamente da `creditiIniziali − costi pagati` — se
+  la banca inserita diverge da quanto realmente speso, l'invariante diverge di
+  conseguenza. Non risolto in questa sessione, solo segnalato.
+  Implementato: `+src/+state/LeagueState.m` (`recomputeScores`). Test aggiornati:
+  `tAuctionPriceTest.stateScoresHasCreditoStimatoColumn`,
+  `tLeagueStateCsvTest.createFromCsvBuildsTeamsWithValueAndCredits` (stessa formula,
+  prima non includevano la sottrazione). Suite completa: 74/74 pass dopo la modifica.
+
 *(continua ad ogni nuova decisione)*

@@ -15,9 +15,11 @@ classdef tLeagueStateCsvTest < matlab.unittest.TestCase
 
             % teamValue = somma del valore di svincolo netto (decisionale) dei giocatori
             % posseduti, non il costo pagato in asta (2026-08-04). Invariante di budget: se
-            % TUTTI i giocatori posseduti svincolano, il netto totale torna esatto al budget
-            % lega (creditiIniziali totali * (1+epsilon)) -- vedi recomputeScores.
-            totalBudget = sum(state.teams.table.creditiIniziali) * (1 + state.epsilon);
+            % TUTTI i giocatori posseduti svincolano, il netto totale torna esatto al pool
+            % di lega -- creditiIniziali totali * (1+epsilon) meno la banca residua gia'
+            % ferma fuori dai giocatori (2026-08-05, vedi recomputeScores).
+            totalBudget = sum(state.teams.table.creditiIniziali) * (1 + state.epsilon) ...
+                - sum(src.state.LeagueState.bankResiduoVector(state));
             testCase.verifyEqual(sum(state.teams.table.teamValue), totalBudget, 'AbsTol', 1e-6);
             testCase.verifyNotEqual(state.teams.table.teamValue(idxLam), 149 + 18);
         end

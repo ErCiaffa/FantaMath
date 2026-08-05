@@ -33,12 +33,18 @@ classdef tAuctionPriceTest < matlab.unittest.TestCase
 
             testCase.verifyTrue(ismember('creditoStimato', state.scores.Properties.VariableNames));
             ownedMask = state.players.owned;
-            totalBudget = sum(state.teams.table.creditiIniziali) * (1 + state.epsilon);
             % 2026-08-04: the invariant moved from gross to NET -- "se tutti svincolano
             % tutti abbiamo W*" (owner's explicit request), i.e. the post-tax total (not
             % the pre-tax creditoStimato) must equal the league budget. Gross is inflated
             % by the bisection in recomputeScores to compensate for the average tax bite.
-            testCase.verifyEqual(sum(state.scores.incassoNettoDecisionale(ownedMask)), totalBudget, 'AbsTol', totalBudget * 0.01);
+            % 2026-08-05: W* now subtracts banca residua (bankOverride/creditiIniziali +
+            % bonus/malus ledger, always additive) -- cash already sitting in bank isn't
+            % also counted in the player-value pool, or a bonus given to one team would
+            % inflate league-wide player values without ever reducing the pool it came
+            % from (owner's explicit request, see docs/decisioni-e-logica.md).
+            totalBudget = sum(state.teams.table.creditiIniziali) * (1 + state.epsilon) ...
+                - sum(src.state.LeagueState.bankResiduoVector(state));
+            testCase.verifyEqual(sum(state.scores.incassoNettoDecisionale(ownedMask)), totalBudget, 'AbsTol', max(1, totalBudget) * 0.01);
         end
 
         function setAuctionParamsRecomputesAndPersists(testCase)

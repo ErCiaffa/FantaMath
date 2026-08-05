@@ -192,11 +192,19 @@ netto assumendo motivo "decisionale" (il più comune), come anteprima.
 
 Vincolo esplicito e verificato (non un'approssimazione): **se tutti i giocatori posseduti
 venissero svincolati oggi, contemporaneamente, per motivo decisionale, la somma dei netti
-deve tornare esatta al budget della lega**:
+deve tornare esatta al pool di lega ancora "in gioco" nei giocatori**:
 
 ```
-budget = Σ creditiIniziali · (1 + epsilon)
+budget = Σ creditiIniziali · (1 + epsilon) − Σ residuo(squadra)
 ```
+
+`residuo(squadra)` = banca attuale + bonus/malus (§11), sempre sottratto dal pool teorico
+(2026-08-05). Motivo: `residuo` è contante già fermo fuori da qualsiasi giocatore — se non
+lo sottraessimo, un bonus dato a una squadra gonfierebbe il pool usato per scalare il valore
+di **tutti** i giocatori di lega, senza mai ridurlo (doppio conteggio: la stessa ricchezza
+contata sia come banca sia come valore-giocatori). Nota: la banca è tracciata a mano
+(`bankOverride`), non derivata automaticamente da `creditiIniziali − costi pagati` — se la
+banca inserita a mano diverge dalla spesa reale, l'invariante diverge di conseguenza.
 
 Il fattore di scala `s` di §8 è trovato per bisezione: `netSumFor(s) = Σ IncassoNetto(s ·
 shape(g))` è monotona crescente in `s`, quindi un'unica bisezione converge in poche decine

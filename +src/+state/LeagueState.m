@@ -80,7 +80,15 @@ classdef LeagueState
             duttilita = rf.Flex - 1.0;
             assembleWeight = src.engine.assembleWeight(score, mod, duttilita, etaWeight);
 
-            totalBudget = sum(state.teams.table.creditiIniziali) * (1 + state.epsilon);
+            % W* = pool teorico di lega meno quanto e' gia' fermo in banca (contante non
+            % legato a nessun giocatore) -- 2026-08-05, richiesta esplicita del
+            % proprietario: la vecchia formula ignorava banca/bonus/malus, quindi un bonus
+            % dato a una squadra gonfiava la ricchezza totale di lega senza mai ridurre il
+            % pool usato per scalare il valore netto dei giocatori (doppio conteggio).
+            % bankResiduoVector gia' netta bonus/malus dentro banca_base (sempre additivo,
+            % vedi bankResiduoVector), quindi basta sottrarre la sua somma.
+            totalBudget = sum(state.teams.table.creditiIniziali) * (1 + state.epsilon) ...
+                - sum(src.state.LeagueState.bankResiduoVector(state));
             taxParams = struct('taxEstero', p.taxEstero, 'taxDecisionale', p.taxDecisionale, ...
                 'taxPlusvalenza', p.taxPlusvalenza, 'taxMinusvalenza', p.taxMinusvalenza, 'taxFee', p.taxFee);
             costo = state.players.costo;
