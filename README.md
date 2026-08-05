@@ -1,5 +1,13 @@
 # FantaManager
 
+![MATLAB](https://img.shields.io/badge/MATLAB-R2025a-orange)
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
+![Tests](https://img.shields.io/badge/tests-74%2F74%20passing-brightgreen)
+![Status](https://img.shields.io/badge/status-uso%20privato-lightgrey)
+
+*(Badge statici, verificati localmente ad ogni modifica — nessuna CI automatica collegata
+al repository, vedi [Test](#test) per riprodurre la verifica.)*
+
 Motore di valutazione economica per una lega Fantacalcio manageriale (regole Mantra)
 pluriennale. Calcola il valore di svincolo e di asta di ogni giocatore a partire da FVM e
 quotazione ufficiali, scarsità di ruolo, età e tassazione; gestisce budget, rose e
@@ -37,6 +45,10 @@ La formula completa, con ogni passaggio e razionale, è documentata in
 ## Per i membri della lega
 
 Apri l'URL fornito dal proprietario della lega (tipicamente `http://<host>:8420`).
+
+Dubbi su come nasce il valore di un giocatore o il prezzo di svincolo? →
+[`docs/GUIDA-LEGA.md`](docs/GUIDA-LEGA.md), spiegazione senza gergo tecnico con esempi
+reali.
 
 | Pagina | Cosa mostra |
 |---|---|
@@ -136,6 +148,7 @@ cd server && python -m pytest tests/ -q
 
 | Documento | Contenuto |
 |---|---|
+| [`docs/GUIDA-LEGA.md`](docs/GUIDA-LEGA.md) | Guida in italiano semplice per i membri della lega — come nascono i valori, con esempi reali e formule spiegate simbolo per simbolo |
 | [`docs/FORMULE.md`](docs/FORMULE.md) | Modello di valutazione completo: ogni formula, parametro e razionale |
 | [`docs/normalizzazione-fvm-quot.md`](docs/normalizzazione-fvm-quot.md) | Analisi dettagliata della normalizzazione FVM/QUOT |
 | [`docs/decisioni-e-logica.md`](docs/decisioni-e-logica.md) | Log cronologico delle decisioni di design prese durante lo sviluppo |
