@@ -9,20 +9,42 @@ scelta è stata presa (incluse le alternative scartate): `decisioni-e-logica.md`
 
 ---
 
+## Le due fonti ufficiali: FVM e Quotazione
+
+Prima dei nostri calcoli, partiamo sempre da due dati **ufficiali di Fantacalcio.it**, non
+inventati da noi:
+
+**FVM (FantaValore di Mercato)** è l'indicatore ufficiale del valore teorico di un
+calciatore su base 1000, aggiornato **giornalmente** dalla redazione Fantacalcio in base
+alle prestazioni reali e agli eventi di mercato. Serve principalmente come riferimento per
+gli svincoli (in percentuale o in totale) e per le offerte minime nelle buste di mercato.
+Per adattarlo alla nostra lega, l'FVM viene **riproporzionato** sul nostro monte crediti
+(FVMp) — es. un FVM di 100 su base 1000 diventa 50 se la lega ha 500 crediti totali, invece
+di 1000. Dalla stagione 2025/26 è disponibile anche lo storico delle variazioni FVM nella
+scheda di ogni giocatore, utile per vedere l'andamento nel tempo.
+
+**Quotazione** è il parametro fondamentale usato dalle leghe per le compravendite nei
+mercati non esclusivi (dove più giocatori condividono lo stesso ruolo). Varia durante la
+stagione con un algoritmo che bilancia le prestazioni reali (fantamedia, voti, presenze)
+con la quotazione iniziale (basata su storico e blasone del giocatore). Le quotazioni
+ufficiali escono una volta l'anno all'evento Fantacalcio Unveil e sono pubbliche su
+fantacalcio.it e sull'app Leghe Fantacalcio. In Mantra il ruolo assegnato pesa direttamente
+sul valore (diversamente dal Classic, più fluido). Nella pratica, la quotazione serve a
+calcolare il valore di svincolo, le operazioni di mercato, e a determinare l'FVM che
+protegge i giocatori di alto profilo da cali eccessivi.
+
 ## L'idea di base
 
-Ogni giocatore parte da un **punteggio 0-1** (chiamiamolo "quanto è forte"), calcolato
-incrociando due fonti ufficiali:
+Da questi due dati ufficiali calcoliamo un **valore assoluto 0-1** per ogni giocatore — un
+indicatore di **quanto quel giocatore dovrebbe rendere**, non una misura assoluta di
+qualità in sé, ma una stima costruita incrociando FVM e quotazione.
 
-- **FVM** (FantaValore di Mercato) — la stima di rendimento atteso
-- **Quotazione** — il prezzo di listino standard
-
-Poi questo punteggio viene **aggiustato** con dei bonus (mai malus, tranne uno) per tenere
-conto di cose che FVM/quotazione da soli non catturano bene per la nostra lega:
+Poi questo valore viene **aggiustato** con dei bonus (mai malus, tranne uno) per tenere
+conto di cose che FVM/quotazione da soli non catturano bene per la nostra lega specifica:
 
 | Bonus | Per chi | Quanto vale (di default) |
 |---|---|---|
-| **Modificatore ruolo** | Ogni ruolo Mantra ha il suo, deciso a mano dal proprietario lega | Da 0% a +15% a seconda del ruolo |
+| **Modificatore ruolo** | Ogni ruolo Mantra ha il suo, calibrato sullo studio dei dati reali di lega (vedi sezione dedicata) | Da 0% a +15% a seconda del ruolo |
 | **Duttilità** | Chi copre 2+ ruoli Mantra | +3% (2 ruoli) o +5% (3+ ruoli) |
 | **Età** | Under 15-38 anni, scala linearmente | Fino a +10% per i più giovani |
 
@@ -33,12 +55,12 @@ di esplodere se capitano più bonus insieme.
 **Esempio reale (Kean, oggi in lega):**
 
 ```
-Punteggio base (FVM+quotazione):    0,85
-+ modificatore ruolo Pc:            +0,11
-+ duttilità (copre 1 solo ruolo):   +0,00
-+ bonus età:                        +0,06
-────────────────────────────────────────
-Valore finale:                      0,99   (su una scala 0-1, quasi il massimo)
+Valore assoluto (da FVM+quotazione):  0,85
++ modificatore ruolo Pc:              +0,11
++ duttilità (copre 1 solo ruolo):     +0,00
++ bonus età:                          +0,06
+──────────────────────────────────────────
+Valore finale:                        0,99   (su una scala 0-1, quasi il massimo)
 ```
 
 ---
@@ -49,10 +71,10 @@ Il valore 0-1 da solo non dice quanti crediti vale un giocatore in asta — serv
 in una scala di crediti reale, calibrata sul budget della vostra lega specifica (non un
 numero fisso uguale per tutte le leghe).
 
-La conversione **schiaccia forte i valori bassi e allarga quelli alti**: due giocatori
-mediocri non "fanno" un top player, un vero top player costa molto più che
-proporzionalmente. Questo evita che l'app appiattisca troppi giocatori diversi sullo
-stesso prezzo.
+La conversione riflette come funziona un'asta vera: un top player costa molto più che
+proporzionalmente rispetto a un giocatore medio, perché è raro e conteso — due giocatori
+mediocri insieme non valgono quanto un vero campione. La curva di conversione è tarata per
+rispettare questo principio, non per "appiattire" o alterare artificialmente i prezzi.
 
 **Stesso esempio, Kean:**
 ```
@@ -111,16 +133,21 @@ lega — semplicemente sposta credito dal "pool comune" alla sua banca personale
 
 ---
 
-## Il modificatore di ruolo — l'unico numero deciso a mano
+## Il modificatore di ruolo — nasce da uno studio dei dati reali, non a caso
 
-Tutto il resto in questa guida è calcolato automaticamente dai dati. Il **modificatore di
-ruolo** invece lo decide il proprietario lega a mano, ruolo per ruolo (pagina "Ruoli"),
-partendo da un riferimento — "quanto sono più deboli i liberi rimasti rispetto a chi
-possiedi in quel ruolo" — ma la decisione finale resta manuale, non automatica.
+Il **modificatore di ruolo** (pagina "Ruoli") è l'unico punto della pipeline calibrato
+ruolo per ruolo invece che ricavato automaticamente da FVM/quotazione — ma non è una scelta
+arbitraria: parte da un'analisi diretta dei dati reali della nostra lega, calcolata così:
 
-Motivo: è l'unico punto dove entra un giudizio soggettivo ("questo ruolo è strategicamente
-più importante nella nostra lega specifica"), tutto il resto della pipeline è meccanico e
-riproducibile allo stesso modo per tutti.
+> per ogni ruolo, quanto sono più deboli i giocatori liberi rimasti rispetto a quelli già
+> posseduti in quel ruolo (differenza media di FVM) — se perdi un giocatore in quel ruolo,
+> quanto è difficile davvero rimpiazzarlo con chi c'è ancora sul mercato?
+
+Questo numero — il "Consigliato" — è visibile e verificabile da chiunque nella pagina
+Ruoli, insieme ai dati grezzi (quanti posseduti, quanti liberi, FVM medio di entrambi) che
+lo generano. Il proprietario lega lo usa come riferimento diretto per calibrare il
+modificatore finale: non è un numero scelto a sentimento, è il risultato di uno studio
+sullo stato reale della lega, aggiornato automaticamente ogni volta che cambia il listone.
 
 ---
 
@@ -134,11 +161,12 @@ differenza, non tutto.
 
 **"Perché due giocatori con lo stesso FVM hanno valori diversi?"**
 Ruolo, età e quanti ruoli coprono cambiano il risultato finale — FVM/quotazione sono solo
-il punto di partenza (il "punteggio base"), non l'ultima parola.
+il punto di partenza (il "valore assoluto"), non l'ultima parola.
 
 **"Il modificatore di ruolo è truccato per favorire qualcuno?"**
-È pubblico, uguale per tutti i giocatori dello stesso ruolo (non per squadra), e visibile
-nella pagina Ruoli — chiunque può controllarlo in ogni momento.
+No — nasce dallo studio dei dati reali di lega (vedi sopra), è uguale per tutti i giocatori
+dello stesso ruolo (non per squadra o per manager), e sia il numero che i dati grezzi che
+lo generano sono pubblici nella pagina Ruoli — chiunque può controllarli in ogni momento.
 
 **"Se svincolo prima degli altri ho un vantaggio?"**
 No — l'invariante di budget (sopra) fa sì che il valore di ogni giocatore sia già calcolato
