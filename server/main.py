@@ -1,5 +1,6 @@
 import io
 import json
+import math
 import os
 import re
 import time
@@ -156,26 +157,22 @@ def export_listone():
     ws = wb.active
     ws.title = "Lista calciatori"
     headers = [
-        "#", "Nome", "Fuori lista", "Ruolo", "Ruolo Mantra", "FantaSquadra", "Costo",
-        "FVM", "QUOT", "Credito stimato (lordo)", "Netto svincolo",
+        "#", "Nome", "Fuori lista", "Ruolo Mantra", "FantaSquadra", "Valore", "Netto svincolo",
     ]
     ws.append(headers)
 
     for p in state.get("players", []):
         owned = bool(p.get("owned"))
         s = scores_by_id.get(p.get("id"), {})
+        netto = s.get("incassoNettoDecisionale")
         ws.append([
             p.get("id"),
             p.get("nome"),
             "*" if p.get("fuoriLista") else "",
-            p.get("roleClassic"),
             p.get("roleMantra"),
             p.get("team") if owned else "",
-            p.get("costo") if owned else None,
-            p.get("fvm"),
-            p.get("quot"),
-            s.get("creditoStimato") if owned else None,
-            s.get("incassoNettoDecisionale") if owned else None,
+            s.get("assembleWeight"),
+            math.ceil(netto) if owned and netto is not None else None,
         ])
 
     buffer = io.BytesIO()

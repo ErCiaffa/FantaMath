@@ -1,5 +1,11 @@
 const appBody = document.getElementById("app-body");
 
+// Tutti i valori in crediti (costo, lordo, netto, plus/minus, ecc.) si mostrano interi,
+// arrotondati per eccesso (2026-08-05, richiesta esplicita del proprietario).
+function fmtCredit(v) {
+  return v === null || v === undefined || Number.isNaN(Number(v)) ? "—" : String(Math.ceil(Number(v)));
+}
+
 const ICON_PATHS = {
   grid: '<rect width="7" height="7" x="3" y="3" rx="1.3"/><rect width="7" height="7" x="14" y="3" rx="1.3"/><rect width="7" height="7" x="14" y="14" rx="1.3"/><rect width="7" height="7" x="3" y="14" rx="1.3"/>',
   list: '<line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/>',
@@ -917,11 +923,11 @@ function renderTaxPanel(state) {
 
     <div class="panel">
       <div class="panel-head"><h2>Impatto totale (se tutti svincolassero ora, decisionale)</h2></div>
-      <p class="sub mono">Lordo: ${lordoTot.toFixed(1)}  →  Netto: ${nettoTot.toFixed(1)}  (calo ${calo.toFixed(1)}%)</p>
+      <p class="sub mono">Lordo: ${fmtCredit(lordoTot)}  →  Netto: ${fmtCredit(nettoTot)}  (calo ${calo.toFixed(1)}%)</p>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Nome</th><th>Costo</th><th>Lordo</th><th>Netto</th></tr></thead>
-          <tbody>${rows.slice(0, 30).map((r) => `<tr><td>${r.nome}</td><td class="mono sub">${r.costo}</td><td class="mono sub">${r.lordo.toFixed(1)}</td><td class="mono" style="font-weight:700;">${r.netto.toFixed(1)}</td></tr>`).join("")}</tbody>
+          <tbody>${rows.slice(0, 30).map((r) => `<tr><td>${r.nome}</td><td class="mono sub">${fmtCredit(r.costo)}</td><td class="mono sub">${fmtCredit(r.lordo)}</td><td class="mono" style="font-weight:700;">${fmtCredit(r.netto)}</td></tr>`).join("")}</tbody>
         </table>
       </div>
     </div>
@@ -1310,7 +1316,7 @@ function renderPlayerList(state) {
   let filterText = "";
   const filterRoles = new Set();
   let filterSquadra = "";
-  let filterOwned = ""; // "" = tutti, "owned" = solo posseduti, "free" = solo svincolati/liberi
+  let filterOwned = ""; // "" = tutti, "owned" = solo posseduti, "free" = solo svincolati/liberi, "fuorilista" = estero/fuori lista
 
   const roles = Array.from(new Set(rows.flatMap((r) => (r.ruolo || "").split("/")).filter(Boolean))).sort();
   const squadre = Array.from(new Set(rows.map((r) => r.fantaSquadra).filter(Boolean))).sort();
@@ -1321,7 +1327,8 @@ function renderPlayerList(state) {
       if (filterRoles.size > 0 && !(r.ruolo || "").split("/").some((tok) => filterRoles.has(tok))) return false;
       if (filterSquadra && r.fantaSquadra !== filterSquadra) return false;
       if (filterOwned === "owned" && !r.owned) return false;
-      if (filterOwned === "free" && r.owned) return false;
+      if (filterOwned === "free" && (r.owned || r.fuoriLista)) return false;
+      if (filterOwned === "fuorilista" && !r.fuoriLista) return false;
       return true;
     });
     filtered.sort((a, b) => {
@@ -1349,7 +1356,7 @@ function renderPlayerList(state) {
           <td class="team-name">${r.nome}${r.fuoriLista ? ' <span class="pill pill-out">fuori lista</span>' : ""}</td>
           <td>${r.ruolo}</td>
           <td>${r.fantaSquadra || "—"}</td>
-          <td class="num mono">${r.costo ?? "—"}</td>
+          <td class="num mono">${fmtCredit(r.costo)}</td>
           <td class="num mono">${r.fvm}</td>
           <td class="num mono">${r.quot}</td>
           <td class="num mono">${fmt(r.fScore, 3)}</td>
@@ -1359,8 +1366,8 @@ function renderPlayerList(state) {
           <td class="num mono">${fmt(r.duttilita, 3)}</td>
           <td class="num mono">${fmt(r.etaWeight, 3)}</td>
           <td class="num mono" style="font-weight:700; color:var(--gold);">${fmt(r.assembleWeight, 3)}</td>
-          <td class="num mono" style="font-weight:700; color:var(--accent);">${fmt(r.creditoStimato, 1)}</td>
-          <td class="num mono" style="font-weight:700; color:var(--gold);">${r.nettoSvincolo === null || r.nettoSvincolo === undefined ? "—" : fmt(r.nettoSvincolo, 1)}</td>
+          <td class="num mono" style="font-weight:700; color:var(--accent);">${fmtCredit(r.creditoStimato)}</td>
+          <td class="num mono" style="font-weight:700; color:var(--gold);">${fmtCredit(r.nettoSvincolo)}</td>
         </tr>`
       )
       .join("");
@@ -1439,7 +1446,8 @@ function renderPlayerList(state) {
         <select class="input" id="player-owned-filter">
           <option value="">Tutti</option>
           <option value="owned">Solo posseduti</option>
-          <option value="free">Solo svincolati (liberi)</option>
+          <option value="free">Solo svincolati (liberi, esclusi estero)</option>
+          <option value="fuorilista">Fuori lista / estero</option>
         </select>
       </div>
     </div>
@@ -1503,8 +1511,10 @@ function renderPlayerList(state) {
       if (filterRoles.has(role)) {
         filterRoles.delete(role);
         btn.classList.remove("btn-primary");
+        btn.classList.add("btn-ghost");
       } else {
         filterRoles.add(role);
+        btn.classList.remove("btn-ghost");
         btn.classList.add("btn-primary");
       }
       renderTable();
@@ -1532,6 +1542,21 @@ function renderPlayerList(state) {
   document.getElementById("players-back-btn").addEventListener("click", () => loadAndRender());
 }
 
+function renderSvincoliRows(roster) {
+  return roster
+    .map(
+      (p) => `<tr>
+      <td class="team-name">${p.nome}${p.fuoriLista ? ' <span class="pill pill-out">estero/fuori lista</span>' : ""}</td>
+      <td class="mono sub">${p.ruolo}</td>
+      <td class="num mono sub">${fmtCredit(p.costo)}</td>
+      <td class="num mono">${fmtCredit(p.lordo)}</td>
+      <td class="num mono" style="font-weight:700;">${fmtCredit(p.netto)}</td>
+      <td class="num mono"><span class="pill ${p.delta >= 0 ? "pill-plus" : "pill-minus"}">${p.delta >= 0 ? "+" : ""}${Math.ceil(p.delta)}</span></td>
+    </tr>`
+    )
+    .join("");
+}
+
 function renderTeamPanel(state, teamName) {
   renderNavbar("dashboard", true);
   const team = state.teams.table.find((t) => t.name === teamName);
@@ -1549,7 +1574,7 @@ function renderTeamPanel(state, teamName) {
       const netto = s.incassoNettoDecisionale || 0;
       const costo = p.costo || 0;
       const mantraRoles = (p.roleMantra || "").split("/").filter(Boolean);
-      return { nome: p.nome, ruolo: p.roleMantra || "", mantraRoles, costo, lordo, netto, delta: netto - costo };
+      return { nome: p.nome, ruolo: p.roleMantra || "", mantraRoles, costo, lordo, netto, delta: netto - costo, fuoriLista: !!p.fuoriLista };
     })
     .sort((a, b) => b.lordo - a.lordo);
 
@@ -1630,7 +1655,7 @@ function renderTeamPanel(state, teamName) {
             return `<tr>
               <td class="team-name mono">${f.formation}</td>
               <td>${statusCell}</td>
-              <td class="num mono" style="font-weight:${isBest ? 700 : 400};">${f.feasible ? f.totalValue.toFixed(1) : "—"}</td>
+              <td class="num mono" style="font-weight:${isBest ? 700 : 400};">${f.feasible ? fmtCredit(f.totalValue) : "—"}</td>
             </tr>`;
           })
           .join("")}</tbody>
@@ -1641,7 +1666,7 @@ function renderTeamPanel(state, teamName) {
     <div class="grid-2">
       <div class="panel">
         <div class="panel-head"><h2>Titolari — modulo ${bestFormation.formation}</h2>
-          <span class="hint">Valore ${bestFormation.totalValue.toFixed(1)}</span></div>
+          <span class="hint">Valore ${fmtCredit(bestFormation.totalValue)}</span></div>
         <div class="table-wrap"><table>
           <thead><tr><th>Ruolo</th><th>Nome</th><th class="num">Valore</th></tr></thead>
           <tbody>${bestFormation.slots
@@ -1650,7 +1675,7 @@ function renderTeamPanel(state, teamName) {
               return `<tr>
                 <td class="mono sub">${slot.roles.join("/")}</td>
                 <td class="team-name">${p ? p.nome : "—"}</td>
-                <td class="num mono">${p ? p.lordo.toFixed(1) : "—"}</td>
+                <td class="num mono">${p ? fmtCredit(p.lordo) : "—"}</td>
               </tr>`;
             })
             .join("")}</tbody>
@@ -1683,20 +1708,10 @@ function renderTeamPanel(state, teamName) {
       ${
         roster.length === 0
           ? '<p class="sub">Nessun giocatore posseduto.</p>'
-          : `<div class="table-wrap"><table>
+          : `<input class="input mono" id="svincoli-filter" placeholder="Filtra per nome…" style="margin-bottom:10px; width:100%; max-width:20rem;" />
+      <div class="table-wrap"><table>
         <thead><tr><th>Nome</th><th>Ruolo</th><th class="num">Costo</th><th class="num">Lordo</th><th class="num">Netto</th><th class="num">Plus/Minus</th></tr></thead>
-        <tbody>${roster
-          .map(
-            (p) => `<tr>
-            <td class="team-name">${p.nome}</td>
-            <td class="mono sub">${p.ruolo}</td>
-            <td class="num mono sub">${p.costo}</td>
-            <td class="num mono">${p.lordo.toFixed(1)}</td>
-            <td class="num mono" style="font-weight:700;">${p.netto.toFixed(1)}</td>
-            <td class="num mono"><span class="pill ${p.delta >= 0 ? "pill-plus" : "pill-minus"}">${p.delta >= 0 ? "+" : ""}${p.delta.toFixed(1)}</span></td>
-          </tr>`
-          )
-          .join("")}</tbody>
+        <tbody id="svincoli-tbody">${renderSvincoliRows(roster)}</tbody>
       </table></div>`
       }
     </div>
@@ -1717,6 +1732,15 @@ function renderTeamPanel(state, teamName) {
 
   document.getElementById("team-back-btn").addEventListener("click", () => loadAndRender());
   document.getElementById("team-back-btn-2").addEventListener("click", () => loadAndRender());
+
+  const svincoliFilter = document.getElementById("svincoli-filter");
+  if (svincoliFilter) {
+    svincoliFilter.addEventListener("input", () => {
+      const q = svincoliFilter.value.trim().toLowerCase();
+      const filtered = q ? roster.filter((p) => p.nome.toLowerCase().includes(q)) : roster;
+      document.getElementById("svincoli-tbody").innerHTML = renderSvincoliRows(filtered);
+    });
+  }
 }
 
 async function renderLeagueBar() {

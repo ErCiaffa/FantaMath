@@ -406,4 +406,56 @@ questo limite di stabilità esplicitamente accettato, non ignorato.
   `tLeagueStateCsvTest.createFromCsvBuildsTeamsWithValueAndCredits` (stessa formula,
   prima non includevano la sottrazione). Suite completa: 74/74 pass dopo la modifica.
 
+- **2026-08-07 (`auctionExpK`: 4.5 → 2.5, ricalibrazione)**: `expK=4.5` era stato scelto
+  guardando solo la forma della distribuzione crediti (spread, no ammassamento in fondo —
+  vedi voce 2026-08-04 "conversione finale in crediti"), mai verificato contro un
+  riferimento di mercato oggettivo. Trovato il problema analizzando la rosa Hoffenaimer:
+  quotazione/FVM aggregati più alti di tutta la lega (337/1450, 1° su 10) ma valore
+  calcolato solo 7°/10 — sintomo di un esponente troppo aggressivo che premia il singolo
+  fenomeno più della ricchezza aggregata della rosa. Verificato su tutte e 10 le squadre:
+  a `expK=4.5` `corr(quotazione, valore)=0.40`, a `expK=2.0–2.5` sale a `0.87–0.89` (miglior
+  fit), mantenendo comunque una correlazione positiva col miglior giocatore singolo (non
+  annullando il premio fenomeno, solo riportandolo in scala). Effetto sui 295 giocatori
+  posseduti: i 14 top (`assembleWeight≥0.6`) perdono in media −48.6% (Martinez L./Malen,
+  i due più estremi, −64% ciascuno), i restanti 281 guadagnano, concentrato soprattutto
+  nelle fasce medio/basse (+20/+72% medio) — la torta totale lega resta quasi invariata
+  (5401→5404), è una redistribuzione interna, non un'inflazione. Cambiato dall'interfaccia
+  (pagina "Conversione crediti", non da codice). Nessun altro parametro toccato in questa
+  sessione (`roleOverride` resta neutro a 1.0 su tutti i ruoli, tasse invariate).
+
+- **2026-08-07 (`auctionExpK` 2.5 → 0.95, `auctionOffsetC` 0.52 → 0, seconda ricalibrazione
+  nella stessa giornata)**: il proprietario ha posto tre vincoli espliciti sul risultato
+  finale: il top della lega (Martinez L., aWeight=1.039) deve valere circa 100 crediti, Kean
+  (il suo miglior giocatore) 70-80, la distribuzione non deve essere troppo compatta/ammassata
+  in fascia media. Testate sistematicamente 13 famiglie di formula (esponenziali a più
+  intensità, lineare, radice, logaritmiche, ibride lineare+potenza, sigmoidi), poi affinato
+  con una grid search fine sull'esponente (`k*aw^p`, `p` da 0.80 a 1.50): `p=0.95` è il punto
+  che centra entrambi i target (Martinez=101.9, Kean=76.7) con la correlazione più alta con
+  la quotazione di mercato oggettiva tra le formule che rispettano i target (r=0.966) e quasi
+  dimezza l'ammassamento rispetto a `expK=2.5` (87 vs 141 giocatori in banda 5 crediti).
+  **Contro-argomento ricevuto da un consiglio di AI esterne** (query al provider Antigravity,
+  modalità agent-enhanced): proponeva di andare nella direzione opposta, esponente convesso
+  `p=1.25-1.40`, sostenendo che la convessità avrebbe "cancellato" le compressioni a monte
+  (log della pipeline normalizeScore + tassazione svincolo) riducendo l'ammassamento.
+  **Verificato empiricamente sui 295 giocatori reali e confutato**: l'ammassamento resta
+  piatto (85-91) su tutto il range 0.90-1.50, non scende affatto salendo con `p` come previsto
+  dall'argomento teorico; nel frattempo Martinez/Kean sforano i target sopra `p=1.1` e la
+  correlazione mercato peggiora costantemente (0.97 a p=0.90 → 0.83 a p=1.50). Il
+  ragionamento del consiglio era analiticamente plausibile ma non verificato sui dati reali di
+  questa lega, motivo per cui è stato scartato solo dopo verifica numerica indipendente, non
+  per fiducia/sfiducia aprioristica nella fonte. Eseguiti anche due controlli di robustezza
+  richiesti dal consiglio: stress test su acquisti sbagliati in asta (aWeight basso, costo
+  pagato alto) — il recupero minusvalenza del 15% non genera netti sproporzionati; audit
+  inversioni di ranking — 1487 coppie su 43365 (3.4%) hanno un giocatore a aWeight più basso
+  che vale più crediti di uno a aWeight più alto, dovuto al meccanismo fiscale su
+  plus/minusvalenza rispetto al costo pagato in asta, quota giudicata fisiologica.
+  **Limite noto, segnalato dal consiglio e non risolto**: l'esponente `p=0.95` è stato
+  scelto per centrare i valori di due soli giocatori (Martinez L. e Kean) — i loro netti
+  dipendono anche dal costo pagato storico via le tasse, quindi se il listone FVM/QUOT
+  cambiasse sensibilmente per questi due, la calibrazione andrebbe rifatta, non è un punto
+  fisso strutturale della lega. Applicato in coda azioni (`setAuctionParams`,
+  `offsetC=0, expK=0.95, floorCredito=1`), non ancora processato da `watchLeague.m` al momento
+  della scrittura (nessuna istanza MATLAB/server attiva) — resta "pending" in
+  `config/leagues/mantramanager/queue.json` finché l'app non viene rilanciata.
+
 *(continua ad ogni nuova decisione)*
